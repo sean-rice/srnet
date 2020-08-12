@@ -1,1 +1,1 @@
-from . import unsupervised_head
+from . import image_decoder, unsupervised_head
