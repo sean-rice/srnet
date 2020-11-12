@@ -285,9 +285,29 @@ class UxRCNN(torch.nn.Module):
             x["image"].to(self.device) for x in batched_inputs
         ]
         if normalize == True:
-            images = [(x - self.pixel_mean) / self.pixel_std for x in images]
+            images = [self._normalize(x) for x in images]
         image_list = ImageList.from_tensors(images, self.backbone.size_divisibility)
         return image_list
+
+    def _normalize(
+        self,
+        image: torch.Tensor,
+        mean: Optional[torch.Tensor] = None,
+        std: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        mean = self.pixel_mean if mean is None else mean
+        std = self.pixel_std if std is None else std
+        return (image - mean) / std
+
+    def _denormalize(
+        self,
+        image: torch.Tensor,
+        mean: Optional[torch.Tensor] = None,
+        std: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        mean = self.pixel_mean if mean is None else mean
+        std = self.pixel_std if std is None else std
+        return (image * std) + mean
 
     def preprocess_batch_order(
         self, batched_inputs: List[Dict[str, Any]]
