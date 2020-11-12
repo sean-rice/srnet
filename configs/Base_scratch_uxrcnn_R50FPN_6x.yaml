@@ -1,0 +1,9 @@
+_BASE_: "./Base_scratch_uxrcnn_R50FPN_5x.yaml"
+# Replace 5x schedule with 6x schedule
+SOLVER:
+  # 6x schedule w/ batch size 12
+  IMS_PER_BATCH: 12  # (12/16) := R
+  MAX_ITER: 720000 # 90k * 6x/R == 720k
+  STEPS: (640000, 693333) # last 60k/R and last 20k/R
+  # LR Linear scaling rule
+  BASE_LR: 0.015 # 0.02*R == 0.015

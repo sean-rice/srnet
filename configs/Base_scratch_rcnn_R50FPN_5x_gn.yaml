@@ -1,0 +1,70 @@
+MODEL:
+  WEIGHTS: "" # srnet: scratch
+  PIXEL_MEAN: [103.530, 116.280, 123.675] # srnet: scratch; explicit, but same as d2 default
+  PIXEL_STD: [57.375, 57.120, 58.395] # srnet: scratch; not transfer learning so not absorbed into conv1
+  META_ARCHITECTURE: "GeneralizedRCNN"
+  MASK_ON: False # srnet: Faster R-CNN default
+  KEYPOINT_ON: False # srnet: explicit, but same as d2 default
+  BACKBONE:
+    NAME: "build_resnet_fpn_backbone"
+    FREEZE_AT: 0 # srnet: scratch
+  RESNETS:
+    OUT_FEATURES: ["res2", "res3", "res4", "res5"]
+    DEPTH: 50
+    NORM: "GN" # srnet: gn, scratch
+    STRIDE_IN_1X1: False # srnet: gn, scratch
+  FPN:
+    IN_FEATURES: ["res2", "res3", "res4", "res5"]
+    NORM: "GN" # srnet: gn, scratch
+  ANCHOR_GENERATOR:
+    SIZES: [[32], [64], [128], [256], [512]]  # One size for each in feature map
+    ASPECT_RATIOS: [[0.5, 1.0, 2.0]]  # Three aspect ratios (same for all in feature maps)
+  RPN:
+    IN_FEATURES: ["p2", "p3", "p4", "p5", "p6"]
+    PRE_NMS_TOPK_TRAIN: 2000  # Per FPN level
+    PRE_NMS_TOPK_TEST: 1000  # Per FPN level
+    # Detectron1 uses 2000 proposals per-batch,
+    # (See "modeling/rpn/rpn_outputs.py" for details of this legacy issue)
+    # which is approximately 1000 proposals per-image since the default batch size for FPN is 2.
+    POST_NMS_TOPK_TRAIN: 1000
+    POST_NMS_TOPK_TEST: 1000
+  ROI_HEADS:
+    NAME: "StandardROIHeads"
+    IN_FEATURES: ["p2", "p3", "p4", "p5"]
+  ROI_BOX_HEAD:
+    NAME: "FastRCNNConvFCHead"
+    POOLER_RESOLUTION: 7
+    NUM_CONV: 4 # srnet: gn; 4conv1fc head from GN paper
+    NUM_FC: 1 # srnet: gn; 4conv1fc head from GN paper
+    NORM: "GN" # srnet: gn
+  ROI_MASK_HEAD:
+    NAME: "MaskRCNNConvUpsampleHead"
+    NUM_CONV: 4
+    POOLER_RESOLUTION: 14
+    NORM: "GN" # srnet: gn
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: True # srnet: explicit, but same as d2 default
+DATASETS:
+  TRAIN: ("coco_2017_train",)
+  TEST: ("coco_2017_val",)
+SOLVER:
+  AMP:
+    ENABLED: False
+  CHECKPOINT_PERIOD: 5000
+  # 5x schedule w/ batch size 12
+  # we use 12 as our batch size because it is both less than 16 (avoids
+  # potential memory issues in larger models) and it is highly-composite,
+  # meaning it will work for 1, 2, 3, 4, 6, or 12 gpu configurations.
+  IMS_PER_BATCH: 12  # (12/16) := R
+  MAX_ITER: 600000 # 90k * 5x/R == 600k
+  STEPS: (520000, 573333) # last 60k/R and last 20k/R
+  # Standard LR & schedule
+  BASE_LR: 0.015 # 0.02*R == 0.015
+  WARMUP_FACTOR: 0.001
+  WARMUP_ITERS: 1000
+  WARMUP_METHOD: "linear"
+  GAMMA: 0.1 # drop LR by 10x after each of "STEPS" iters
+INPUT:
+  MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
+VIS_PERIOD: 5000
+VERSION: 2

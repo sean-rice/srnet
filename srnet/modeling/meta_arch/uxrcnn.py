@@ -1,21 +1,21 @@
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from detectron2.config import configurable
-from detectron2.data.detection_utils import convert_image_to_rgb
 from detectron2.modeling.backbone import Backbone, build_backbone
 from detectron2.modeling.postprocessing import detector_postprocess
 from detectron2.modeling.proposal_generator import build_proposal_generator
 from detectron2.modeling.roi_heads import build_roi_heads
 from detectron2.structures import ImageList, Instances
 from detectron2.utils.events import get_event_storage
-import numpy as np
 import torch
 
 from ..unsupervised.unsupervised_head import UnsupervisedHead, build_unsupervised_head
+from .build import META_ARCH_REGISTRY
 
 __all__ = ["UxRCNN"]
 
 
+@META_ARCH_REGISTRY.register()
 class UxRCNN(torch.nn.Module):
     """
     """
@@ -73,12 +73,15 @@ class UxRCNN(torch.nn.Module):
     def device(self):
         return self.pixel_mean.device
 
-    def forward(self, batched_inputs, normalize: bool = True):
+    def forward(
+        self, batched_inputs: List[Dict[str, Any]], normalize: bool = True
+    ) -> Union[List[Dict[str, Any]], Dict[str, torch.Tensor]]:
         """
         Args:
-            batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
-                Each item in the list contains the inputs for one image.
-                For now, each item in the list is a dict that contains:
+            batched_inputs (List[Dict[str, Any]]): a list, batched outputs of
+                :class:`DatasetMapper`. Each item in the list contains the
+                inputs for one image. For now, each item in the list is a dict
+                that contains:
                 * image: Tensor, image in (C, H, W) format.
                 * instances (optional): groundtruth :class:`Instances`
                 * proposals (optional): :class:`Instances`, precomputed
@@ -93,14 +96,16 @@ class UxRCNN(torch.nn.Module):
                 as input.
         
         Returns:
-            list[dict]:
-                Each dict is the output for one input image.
-                The dict contains one key "instances" whose value is a
-                :class:`Instances`, as well as an "unsupervised_output" key of
-                unspecified (but likely :class:`torch.Tensor`) type.
-                The :class:`Instances` object has the following keys:
+            results (List[Dict[str, Any]] or Dict[str, torch.Tensor]):
+                During training, returns a dictionary of losses.
+
+                During inference, a list of dicts, where each dict is the
+                output for one input image.
+                The dict contains: 1) a key "instances" whose value is a
+                :class:`Instances`, which has the following keys:
                 "pred_boxes", "pred_classes", "scores", "pred_masks",
-                "pred_keypoints"
+                "pred_keypoints"; and 2) an "unsupervised" key of unspecified
+                (but likely :class:`torch.Tensor`-or-`None`) type.
         """
         if not self.training:
             return self.inference(batched_inputs)
@@ -120,8 +125,8 @@ class UxRCNN(torch.nn.Module):
         gt_instances: Optional[List[Instances]]
         features_for_detector: Optional[Dict[str, torch.Tensor]]
         proposals: Optional[Any]
-        proposal_losses: Dict[str, torch.Tensor]
-        detector_losses: Dict[str, torch.Tensor]
+        proposal_losses: Dict[str, torch.Tensor] = {}
+        detector_losses: Dict[str, torch.Tensor] = {}
         if n_labeled > 0:
             gt_instances = [
                 x["instances"].to(self.device) for x in batched_inputs[i_labeled_0:]
@@ -140,7 +145,6 @@ class UxRCNN(torch.nn.Module):
             else:
                 assert "proposals" in batched_inputs[i_labeled_0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
-                proposal_losses = {}
 
             # run roi heads (detector)
             _, detector_losses = self.roi_heads(
@@ -150,13 +154,12 @@ class UxRCNN(torch.nn.Module):
             gt_instances = None
             features_for_detector = None
             proposals = None
-            proposal_losses = {}
-            detector_losses = {}
 
         # unsupervised objective head
+        unsupervised_losses: Dict[str, torch.Tensor]
         _, unsupervised_losses = self.unsupervised_head(
-            features, {"images": images}
-        )  # TODO
+            features, {"inputs": batched_inputs, "images": images}
+        )
 
         if self.vis_period > 0:
             storage = get_event_storage()
@@ -166,12 +169,115 @@ class UxRCNN(torch.nn.Module):
         losses = {}
         losses.update(detector_losses)
         losses.update(proposal_losses)
+        losses.update(unsupervised_losses)
         return losses
+
+    def inference(
+        self,
+        batched_inputs: List[Dict[str, Any]],
+        do_unsupervised: bool = True,
+        do_postprocess: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform inference on a batch of images.
+
+        NOTE: To accomodate torch.nn.Module hooks, etc, it is probably better
+        to call the module itself while `self.training == False` than to
+        directly call this method.
+
+        Args:
+            batched_inputs (List[Dict[str, Any]]): see :meth:`self.forward`.
+            do_unsupervised (bool): whether or not to run the unsupervised
+                objective head.
+            do_postprocess (bool): whether or not to post-process the results
+                of both the roi heads and the unsupervised objective.
+        
+        Returns:
+            results (List[Dict[str, Any]]): see :meth:`self.forward`.
+        """
+        images = self.preprocess_image(batched_inputs)
+        features: Dict[str, torch.Tensor] = self.backbone(images.tensor)
+
+        if self.proposal_generator:
+            proposals, _ = self.proposal_generator(images, features, None)
+        else:
+            assert "proposals" in batched_inputs[0]
+            proposals = [x["proposals"].to(self.device) for x in batched_inputs]
+
+        detector_results: Optional[List[Instances]]
+        detector_results, _ = self.roi_heads(images, features, proposals, None)
+
+        unsupervised_results: Optional[List[torch.Tensor]] = None
+        if do_unsupervised == True and isinstance(
+            self.unsupervised_head, torch.nn.Module
+        ):
+            unsup_results_raw, _ = self.unsupervised_head(
+                features, {"inputs": batched_inputs, "images": images}
+            )
+            unsupervised_results = self.unsupervised_head.into_per_item_iterable(
+                unsup_results_raw
+            )
+
+        if do_postprocess == True:
+            if detector_results is None or unsupervised_results is None:
+                none_list = [None] * len(batched_inputs)
+            else:
+                none_list = None  # type: ignore
+            results = self._postprocess(
+                batched_inputs,
+                images.images_sizes,
+                none_list if detector_results is None else detector_results,
+                none_list if unsupervised_results is None else unsupervised_results,  # type: ignore[arg-type]
+            )
+        else:
+            raise NotImplementedError("not implemeneted; enable post-processing.")
+            # results: List[Dict[str, Any]] = [{} for _ in range(len(batched_inputs))]
+            # for i, result in enumerate(results):
+            #    result["instances"] = #TODO
+
+        return results
+
+    def _postprocess(
+        self,
+        batched_inputs: List[Dict[str, Any]],
+        images_sizes: List[Tuple[int, int]],
+        detector_results: List[Optional[Instances]],
+        unsupervised_results: List[Optional[torch.Tensor]],
+    ) -> List[Dict[str, Any]]:
+        batched_inputs
+        n_inputs = len(batched_inputs)
+        if n_inputs != len(images_sizes):
+            raise ValueError(f"length mismatch; {n_inputs=} but {len(images_sizes)=}")
+        if n_inputs != len(detector_results):
+            raise ValueError(
+                f"length mismatch; {n_inputs=} but {len(detector_results)=}"
+            )
+        if n_inputs != len(unsupervised_results):
+            raise ValueError(
+                f"length mismatch; {n_inputs=} but {len(unsupervised_results)=}"
+            )
+
+        results: List[Dict[str, Any]] = [{} for _ in range(n_inputs)]
+        for i in range(len(batched_inputs)):
+            image_input = batched_inputs[i]
+            image_size = images_sizes[i]
+            image_instances = detector_results[i]
+            image_unsup_result = unsupervised_results[i]
+
+            h = image_input.get("height", image_size[0])
+            w = image_input.get("width", image_size[1])
+            if image_instances is not None:
+                r = detector_postprocess(image_instances, h, w)
+                results[i]["instances"] = r
+            if image_unsup_result is not None:
+                u = self.unsupervised_head.postprocess(image_unsup_result)
+                results[i]["unsupervised"] = u
+        return results
 
     def preprocess_image(
         self, batched_inputs: List[Dict[str, Any]], normalize: bool = True
-    ) -> "ImageList":
-        r"""
+    ) -> ImageList:
+        """
         Preprocess the input images, including normalization, padding, and
         batching.
         """
@@ -185,8 +291,8 @@ class UxRCNN(torch.nn.Module):
 
     def preprocess_batch_order(
         self, batched_inputs: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], int, int, Iterable[int]]:
-        r"""
+    ) -> Tuple[List[Dict[str, Any]], int, int, List[int]]:
+        """
         Preprocesses an input batch's list order such that the unlabeled
         examples-- those without an "instances" entry-- come before the labeled
         ones. This is important once the batch becomes a single `Tensor` and
@@ -205,7 +311,7 @@ class UxRCNN(torch.nn.Module):
             n_unlabeled (int): The number of unlabeled items from the input
                 list.
             n_labeled (int): The number of labeled items from the input list.
-            sorted_indices (Iterable[int]): The original index in the input of
+            sorted_indices (List[int]): The original index in the input of
                 each item in the returned list. This allows for undoing the
                 sort (putting items back in their original order) at a later
                 stage.
@@ -216,9 +322,11 @@ class UxRCNN(torch.nn.Module):
                 dtype=torch.int,
                 device=torch.device("cpu"),
             )
-            sorted_indices: Iterable[int]
-            sorted_indices = (int(i.item()) for i in torch.argsort(has_instances))
+            sorted_indices = [int(i.item()) for i in torch.argsort(has_instances)]
             n_labeled = int(torch.sum(has_instances).item())
             n_unlabeled = len(batched_inputs) - n_labeled
             batched_inputs = [batched_inputs[i] for i in sorted_indices]
         return batched_inputs, n_unlabeled, n_labeled, sorted_indices
+
+    def visualize_training(self, *args, **kwargs):
+        pass

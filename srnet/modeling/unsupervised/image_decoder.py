@@ -12,8 +12,6 @@ from .unsupervised_head import UNSUPERVISED_HEAD_REGISTRY, UnsupervisedHead
 
 @UNSUPERVISED_HEAD_REGISTRY.register()
 class ImageDecoder(UnsupervisedHead):
-    LOSS_KEY: str = "loss_image_decoder"
-
     @configurable
     def __init__(
         self,
@@ -27,11 +25,15 @@ class ImageDecoder(UnsupervisedHead):
         predictor_dim: int,
         predictor_norm: str,
         loss_weight: float,
+        loss_key: str = "loss_image_decoder",
     ):
+        super(UnsupervisedHead, self).__init__()
+
         self.in_features: List[str] = list(copy.copy(in_features))
         self.output_channels: int = output_channels
         self.common_stride: int = common_stride
         self.loss_weight: float = loss_weight
+        self.loss_key: str = loss_key
 
         feature_strides = {k: v.stride for k, v in input_shape.items()}
         feature_channels = {k: v.channels for k, v in input_shape.items()}
@@ -122,13 +124,13 @@ class ImageDecoder(UnsupervisedHead):
                 loss between the actual input images and the decoded
                 reconstructions.
         """
-        original_images: torch.Tensor = targets["images"].tensor
+        original_images: torch.Tensor = targets["images"].tensor  # ImageList -> Tensor
         decoded_images = self.layers(features)
 
         results: Dict[str, torch.Tensor] = {"decoded_images": decoded_images}
         losses: Dict[str, torch.Tensor] = {}
         if self.training:
-            losses[self.LOSS_KEY] = (
+            losses[self.loss_key] = (
                 torch.nn.functional.mse_loss(
                     decoded_images, original_images, reduction="mean"
                 )
@@ -180,6 +182,7 @@ class ImageDecoder(UnsupervisedHead):
             "predictor_dim": target_node.PREDICTOR_DIM,
             "predictor_norm": target_node.PREDICTOR_NORM,
             "loss_weight": target_node.LOSS_WEIGHT,
+            "loss_key": target_node.LOSS_KEY,
         }
 
     @classmethod
