@@ -1,1 +1,1 @@
-from . import meta_arch, unsupervised
+from . import classifier, meta_arch, unsupervised
