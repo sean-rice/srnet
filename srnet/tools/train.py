@@ -115,6 +115,7 @@ def setup(args):
     """
     Create configs and perform basic setups.
     """
+    srnet.merge_with_detectron2()
     cfg = get_cfg()
     cfg = add_srnet_config(cfg)
     cfg.merge_from_file(args.config_file)
@@ -149,7 +150,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    srnet.merge_with_detectron2()
     args: argparse.Namespace = default_argument_parser().parse_args()
     print("Command Line Args:", args)
     launch(
