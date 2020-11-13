@@ -225,7 +225,7 @@ class UxRCNN(torch.nn.Module):
                 none_list = None  # type: ignore
             results = self._postprocess(
                 batched_inputs,
-                images.images_sizes,
+                images.image_sizes,
                 none_list if detector_results is None else detector_results,
                 none_list if unsupervised_results is None else unsupervised_results,  # type: ignore[arg-type]
             )
@@ -264,13 +264,15 @@ class UxRCNN(torch.nn.Module):
             image_instances = detector_results[i]
             image_unsup_result = unsupervised_results[i]
 
-            h = image_input.get("height", image_size[0])
-            w = image_input.get("width", image_size[1])
+            h: int = image_input.get("height", image_size[0])
+            w: int = image_input.get("width", image_size[1])
             if image_instances is not None:
                 r = detector_postprocess(image_instances, h, w)
                 results[i]["instances"] = r
             if image_unsup_result is not None:
-                u = self.unsupervised_head.postprocess(image_unsup_result)
+                u = self.unsupervised_head.postprocess(
+                    image_unsup_result, image_size, h, w
+                )
                 results[i]["unsupervised"] = u
         return results
 
