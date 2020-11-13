@@ -15,7 +15,7 @@ import pathlib
 from typing import Optional, Any, Dict
 
 from detectron2.config import get_cfg
-from detectron2.data import DatasetCatalog
+from detectron2.data import DatasetCatalog, Metadata
 from detectron2.data.detection_utils import convert_image_to_rgb, read_image
 from detectron2.engine import DefaultPredictor
 from detectron2.utils import visualizer
@@ -58,8 +58,8 @@ def postprocess_to_image(
         output_image = model._denormalize(
             image,
             mean=model.pixel_mean.clone().to(image.device),  # type: ignore[operator]
-            std=model.pixel_std.clone().to(image.device),
-        )  # type: ignore[operator]
+            std=model.pixel_std.clone().to(image.device),  # type: ignore[operator]
+        )
     else:
         output_image = image
     output_image = (
@@ -81,8 +81,11 @@ def postprocess_to_image(
 
 
 def draw_vis(
-    input: Dict[str, Any], metadata, scale: float = 1.0, draw_instances: bool = True
-):
+    input: Dict[str, Any],
+    metadata: Optional[Metadata],
+    scale: float = 1.0,
+    draw_instances: bool = True,
+) -> np.ndarray:
     """
         input (Dict[str, Any]): a dict containing an "image" key (format
             provided by "image_format" key if not RGB) and an optional
