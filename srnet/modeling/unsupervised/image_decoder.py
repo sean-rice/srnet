@@ -7,6 +7,8 @@ import fvcore.nn.weight_init as weight_init
 import numpy as np
 import torch
 
+from srnet.utils._utils import find_cfg_node
+
 from .unsupervised_head import UNSUPERVISED_HEAD_REGISTRY, UnsupervisedHead
 
 
@@ -164,12 +166,12 @@ class ImageDecoder(UnsupervisedHead):
 
     @classmethod
     def from_config(  # type: ignore[override]
-        cls, cfg: CfgNode, input_shape: ShapeSpec, node: str = "MODEL.IMAGE_DECODER",
+        cls,
+        cfg: CfgNode,
+        input_shape: Dict[str, ShapeSpec],
+        node_path: str = "MODEL.IMAGE_DECODER",
     ) -> Dict[str, Any]:
-        node_path = node.split(".")
-        target_node = cfg
-        for next_node in node_path:
-            target_node = getattr(target_node, next_node)
+        target_node = find_cfg_node(cfg, node_path)
 
         return {
             "in_features": target_node.IN_FEATURES,
@@ -189,7 +191,7 @@ class ImageDecoder(UnsupervisedHead):
     def into_per_item_iterable(
         cls, network_output: Dict[str, torch.Tensor]
     ) -> List[torch.Tensor]:
-        return [t.squeeze() for t in network_output["decoded_images"].split(1, dim=0)]
+        return [img for img in network_output["decoded_images"]]
 
     @classmethod
     def postprocess(  # type: ignore[override]

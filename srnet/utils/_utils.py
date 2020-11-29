@@ -1,8 +1,18 @@
 import copy
+import os
+import pathlib
 import random
 from typing import Any, List, Sequence, Tuple
 
-__all__ = ["deepmap", "all_to", "random_split_list"]
+from detectron2.config import CfgNode
+
+__all__ = [
+    "deepmap",
+    "all_to",
+    "random_split_list",
+    "find_cfg_node",
+    "get_datasets_path",
+]
 
 
 def deepmap(inputs: Any, function: Any, qualifier: Any) -> Any:
@@ -65,3 +75,34 @@ def random_list_split(
     left_items = items[:n_left]
     right_items = items[n_left:]
     return left_items, right_items
+
+
+def find_cfg_node(cfg: CfgNode, node_path: str) -> CfgNode:
+    """
+    Finds and returns a target node, given by `node_path`, from a
+    :class:`CfgNode` tree.
+
+    Args:
+        cfg (CfgNode): The root configuration node to search.
+        node_path (str): The name of the desired node to be returned. For
+            example, `"MODEL.CLASSIFIER_HEAD"`.
+    
+    Returns:
+        target_node (CfgNode): The `CfgNode` child of the `cfg` corresponding 
+            to the provided `node_path`.
+    """
+    node_names = node_path.split(".")
+    target_node = cfg
+    for next_node in node_names:
+        target_node = getattr(target_node, next_node)
+    return target_node
+
+
+def get_datasets_path(env_var: str = "DETECTRON2_DATASETS") -> pathlib.Path:
+    root = os.getenv(env_var)
+    if root is None:
+        raise EnvironmentError(
+            f"environment variable {env_var} is unset; can't determine datasets path"
+        )
+    root_path = pathlib.Path(root).expanduser()
+    return root_path
