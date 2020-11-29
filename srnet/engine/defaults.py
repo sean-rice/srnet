@@ -1,11 +1,14 @@
 import logging
 
 from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.data import build_detection_test_loader, build_detection_train_loader
 from detectron2.engine.defaults import DefaultTrainer as _D2DefaultTrainer
 from detectron2.engine.train_loop import AMPTrainer, SimpleTrainer
 from detectron2.utils import comm
 from detectron2.utils.logger import setup_logger
 from torch.nn.parallel import DistributedDataParallel
+
+from ..data.dataset_mappers import SrnetDatasetMapper
 
 __all__ = ["DefaultTrainer"]
 
@@ -58,3 +61,32 @@ class DefaultTrainer(_D2DefaultTrainer):
         self.cfg = cfg
 
         self.register_hooks(self.build_hooks())
+
+    @classmethod
+    def build_train_loader(cls, cfg):
+        """
+        Returns:
+            iterable
+
+        Calls :func:`detectron2.data.build_detection_train_loader`, but with 
+        the custom `srnet` datset mapper `SrnetDatasetMapper` substituted.
+        """
+        if True:
+            mapper = SrnetDatasetMapper(cfg, True, augmentation_builder=None)
+            return build_detection_train_loader(cfg, mapper=mapper)
+        else:
+            return super().build_train_loader(cfg)
+
+    @classmethod
+    def build_test_loader(cls, cfg, dataset_name):
+        """
+        Returns:
+            iterable
+
+        Calls :func:`detectron2.data.build_detection_test_loader`, but with 
+        the custom `srnet` datset mapper `SrnetDatasetMapper` substituted.
+        """
+        if True:
+            mapper = SrnetDatasetMapper(cfg, False, augmentation_builder=None)
+            return build_detection_test_loader(cfg, dataset_name, mapper=mapper)
+        return super().build_test_loader(cfg, dataset_name)
