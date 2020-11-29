@@ -30,7 +30,7 @@ from srnet.config import add_srnet_config
 #%%
 srnet.merge_with_detectron2()
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO if not _DEBUG else logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
 setup_logger()
 
@@ -109,10 +109,10 @@ def draw_vis(
 coco_val = DatasetCatalog.get("coco_2017_val")
 
 uxrcnn_cfg = make_config(
-    "/scratch/rices6/jobs/20201111_coco-detection_scratch_uxrcnn_R50FPN_ae-p5_6x/config.yaml",
+    "/scratch/rices6/jobs/20201112_coco-detection_scratch_uxrcnn_R50FPN_ae-p5_6x/config.yaml",
     config_list=[
         "MODEL.WEIGHTS",
-        "/scratch/rices6/jobs/20201111_coco-detection_scratch_uxrcnn_R50FPN_ae-p5_6x/model_0059999.pth",
+        "/scratch/rices6/jobs/20201112_coco-detection_scratch_uxrcnn_R50FPN_ae-p5_6x/model_0099999.pth",
         "MODEL.DEVICE",
         "cpu",
     ]
@@ -121,8 +121,8 @@ uxrcnn_cfg = make_config(
 uxrcnn_predictor = DefaultPredictor(uxrcnn_cfg)
 
 # %%
-i = 0
-example = coco_val[i]
+i_example = 0
+example = coco_val[i_example]
 example_image = read_image(example["file_name"], uxrcnn_predictor.input_format)
 display(Image.fromarray(example_image))
 display(example_image.shape)
@@ -152,5 +152,56 @@ reconstruction_result = postprocess_to_image(
 # %%
 display(Image.fromarray(detection_result))
 display(Image.fromarray(reconstruction_result))
+
+# %%
+# iterate
+import tqdm
+
+num_iterations = 1024
+iterations_output_path = (
+    pathlib.Path(
+        "/scratch/rices6/misc/iterations/20201112_coco-detection_scratch_uxrcnn_R50FPN_ae-p5_6x/model-0099999/"
+    )
+    / f"coco-val-{i_example}"
+)
+iterations_output_path.mkdir(parents=True, exist_ok=True)
+iteration_results = [None] * (num_iterations + 1)
+for i in tqdm.tqdm(range(0, len(iteration_results)), ascii=True, ncols=60):
+    if i == 0:
+        iteration_results[i] = example_image
+    else:
+        _result = uxrcnn_predictor(iteration_results[i - 1])
+        _reconstruction = postprocess_to_image(
+            _result["unsupervised"], model=uxrcnn_predictor.model, to_rgb=False
+        )
+        iteration_results[i] = _reconstruction
+
+    _image_rgb = convert_image_to_rgb(
+        iteration_results[i], uxrcnn_predictor.input_format
+    )
+    _pil_image = Image.fromarray(_image_rgb)
+    frame_path = iterations_output_path / f"frame-{i:07}.png"
+    _pil_image.save(frame_path)
+
+# %%
+import ipywidgets
+
+
+@ipywidgets.interact(i=ipywidgets.IntSlider(min=0, max=len(iteration_results) - 1))
+def show_iteration(i: int) -> None:
+    image_from_model = iteration_results[i]
+    image_rgb = convert_image_to_rgb(image_from_model, uxrcnn_predictor.input_format)
+    pil_image = Image.fromarray(image_rgb)
+    display(pil_image)
+
+
+# %%
+for iframe in range(0, len(iteration_results)):
+    image_from_model = iteration_results[iframe]
+    image_rgb = convert_image_to_rgb(image_from_model, uxrcnn_predictor.input_format)
+    pil_image = Image.fromarray(image_rgb)
+    pil_image.save(
+        f"/scratch/rices6/misc/iterations/20201112_coco-detection_scratch_uxrcnn_R50FPN_ae-p5_6x/model-0099999/coco-val-{i_example}/frame-{iframe}.png"
+    )
 
 # %%
