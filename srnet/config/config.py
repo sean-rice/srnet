@@ -10,19 +10,25 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
         cfg (detectron2.config.CfgNode): The standard detectron2 config.
 
     Returns:
-        cfg (detectron2.config.CfgNode): The modified config ready for `srnet`s.
+        cfg (detectron2.config.CfgNode): The modified config ready for srnets.
     """
 
     # image classifier configuration
 
-    cfg.MODEL.CLASSIFIER = CfgNode()
-    cfg.MODEL.CLASSIFIER.NUM_CLASSES = -1
-    cfg.MODEL.CLASSIFIER.IN_FEATURES = []  # _type: Union[List[str], str]
-
-    cfg.MODEL.POOLING_CLASSIFIER_HEAD = CfgNode()
-    # The type of global pooling to use.
+    cfg.MODEL.CLASSIFIER_HEAD = CfgNode()
+    cfg.MODEL.CLASSIFIER_HEAD.NAME = "PoolingClassifierHead"
+    cfg.MODEL.CLASSIFIER_HEAD.LOSS_WEIGHT = 1.0
+    cfg.MODEL.CLASSIFIER_HEAD.LOSS_KEY = "loss_classifier"
+    # The number of output classes for the classifier.
+    # potential value(s): num_classes > 1
+    cfg.MODEL.CLASSIFIER_HEAD.NUM_CLASSES = -1
+    # The feature map(s) from the backbone to provide to the classifier head.
+    # For PoolingClassifierHead, this should be a single string, like ["res5"].
+    # Other types of classifier heads may take multiple strings as input.
+    cfg.MODEL.CLASSIFIER_HEAD.IN_FEATURES = []  # _type: List[str]
+    # For PoolingClassifierHead, the type of global pooling to use.
     # potential value(s): "avg" (global avg pooling); "max" (global max pooling)
-    cfg.MODEL.POOLING_CLASSIFIER_HEAD.POOL_METHOD = "avg"
+    cfg.MODEL.CLASSIFIER_HEAD.POOL_METHOD = "avg"
 
     # unsupervised learning configuration
 

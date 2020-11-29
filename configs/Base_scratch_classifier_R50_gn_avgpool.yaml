@@ -1,0 +1,22 @@
+_BASE_: "./Base_scratch_rcnn_R50FPN_5x_gn.yaml"
+
+MODEL:
+  META_ARCHITECTURE: "Classifier"
+  BACKBONE:
+      NAME: "build_resnet_backbone" # basic resnet, no fpn
+  CLASSIFIER_HEAD:
+    NAME: "PoolingClassifierHead"
+    LOSS_WEIGHT: 1.0
+    LOSS_KEY: "loss_classifier"
+    NUM_CLASSES: 1000
+    IN_FEATURES: ["res5"]
+    POOL_METHOD: "avg"
+
+# Replace 5x schedule with 6x schedule
+SOLVER:
+  # 6x schedule w/ batch size 12
+  IMS_PER_BATCH: 12  # (12/16) := R
+  MAX_ITER: 720000 # 90k * 6x/R == 720k
+  STEPS: (640000, 693333) # last 60k/R and last 20k/R
+  # LR Linear scaling rule
+  BASE_LR: 0.015 # 0.02*R == 0.015

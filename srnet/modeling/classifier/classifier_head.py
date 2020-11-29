@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from detectron2.config import CfgNode
 from detectron2.layers import ShapeSpec
@@ -30,25 +30,29 @@ class ClassifierHead(torch.nn.Module, metaclass=ABCMeta):
     will probably have to disable typechecking for their signatures.
     """
 
-    @classmethod
-    @abstractmethod
-    def from_config(
-        cls, cfg: CfgNode, input_shape: Optional[ShapeSpec], *args: Any, **kwargs: Any
-    ) -> Dict[str, Any]:
-        raise NotImplementedError()
+    _loss_weight_default: float = 1.0
+    _loss_key_default: str = "loss_classifier"
 
     @classmethod
     @abstractmethod
-    def postprocess(cls, *args: Any, **kwargs: Any) -> Any:
+    def from_config(
+        cls, cfg: CfgNode, input_shape: Dict[str, ShapeSpec], *args: Any, **kwargs: Any
+    ) -> Dict[str, Any]:
         raise NotImplementedError()
 
     @abstractproperty
     def num_classes(self) -> int:
         raise NotImplementedError()
 
+    @abstractmethod
+    def forward(
+        self, features: Dict[str, torch.Tensor], targets: Optional[torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        raise NotImplementedError()
+
 
 def build_classifier_head(
-    cfg: Any, input_shape: Dict[str, ShapeSpec]
+    cfg: CfgNode, input_shape: Dict[str, ShapeSpec]
 ) -> Optional[ClassifierHead]:
     """
     Create a classifier objective from config.
@@ -56,8 +60,8 @@ def build_classifier_head(
     Returns:
         ClassifierHead: a :class:`ClassifierHead` instance.
     """
-    name = cfg.MODEL.CLASSIFIER.NAME
-    if name == "None":
+    name: str = cfg.MODEL.CLASSIFIER_HEAD.NAME
+    if name is None:
         return None
 
     classifier_module = CLASSIFIER_HEAD_REGISTRY.get(name)(cfg, input_shape=input_shape)
