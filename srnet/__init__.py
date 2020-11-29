@@ -1,6 +1,3 @@
-from detectron2.utils.registry import Registry
-
-
 def merge_with_detectron2():
     """
     Modifies the mutable parts of detectron2's modules/environment (such as
@@ -9,7 +6,17 @@ def merge_with_detectron2():
     design, srnet doesn't modify/monkey-patch any part of `detectron2` without
     calling this function.
     """
+    from detectron2.data import DatasetCatalog, MetadataCatalog
+    from detectron2.modeling.meta_arch import (
+        META_ARCH_REGISTRY as D2_META_ARCH_REGISTRY,
+    )
+    from detectron2.utils.registry import Registry
 
+    from .data import builtin  # noqa
+    from .data.datasets._catalog import SRNET_DATASET_CATALOG, SRNET_METADATA_CATALOG
+    from .modeling.meta_arch.build import META_ARCH_REGISTRY
+
+    # registry merge helper function
     def merge_registries(
         primary: Registry, secondary: Registry, overwrite: bool = False
     ) -> Registry:
@@ -23,10 +30,15 @@ def merge_with_detectron2():
             primary_map[obj_name] = obj_
         return primary
 
-    from detectron2.modeling.meta_arch import (
-        META_ARCH_REGISTRY as D2_META_ARCH_REGISTRY,
-    )
-
-    from .modeling.meta_arch.build import META_ARCH_REGISTRY
-
+    # merging various registries
     merge_registries(D2_META_ARCH_REGISTRY, META_ARCH_REGISTRY)
+
+    # merging dataset catalogs
+    for dataset_name, dataset_callable in SRNET_DATASET_CATALOG.items():
+        DatasetCatalog.register(dataset_name, dataset_callable)
+
+    # merging metadata catalogs
+    for metadata_name, metadata_dict in SRNET_METADATA_CATALOG.items():
+        metadata_catalog = MetadataCatalog.get(metadata_name)
+        for key, value in metadata_dict.items():
+            setattr(metadata_catalog, key, value)
