@@ -2,14 +2,14 @@ import copy
 import os
 import pathlib
 import random
-from typing import Any, List, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 from detectron2.config import CfgNode
 
 __all__ = [
     "deepmap",
     "all_to",
-    "random_split_list",
+    "split_list",
     "find_cfg_node",
     "get_datasets_path",
 ]
@@ -52,16 +52,19 @@ def all_to(inputs: Any, *args: Any, **kwargs: Any) -> Any:
     return deepmap(inputs, f, q)
 
 
-def random_list_split(
-    items: List[Any], seed: int, proportion: float
+def split_list(
+    items: List[Any], proportion: float, seed: Optional[int],
 ) -> Tuple[List[Any], List[Any]]:
     """
-    Splits a `list` randomly (but deterministically) into two portions.
+    Splits a `list`, optionally randomly (but deterministically), into two
+    portions.
 
     Args:
         items (List[Any]): The list of items to split.
-        seed (int): The seed used to determine the random split.
         proportion (float): The proportion of items in the "left" split list.
+        seed (int, optional): The seed used to determine the random split. If
+            `None`, the split isn't randomized and the split is done with the
+            original ordering of the input items.
     
     Returns:
         left_list (List[Any]): The "left" split of the list (with `proportion`
@@ -70,7 +73,8 @@ def random_list_split(
             `1 - proportion` of the original items).
     """
     items = copy.copy(items)
-    random.Random(seed).shuffle(items)
+    if seed is not None:
+        random.Random(seed).shuffle(items)
     n_left = int(proportion * len(items))
     left_items = items[:n_left]
     right_items = items[n_left:]
