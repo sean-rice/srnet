@@ -1,2 +1,3 @@
 from .classifier_head import ClassifierHead, build_classifier_head
+from .linear_classifier import LinearClassifierHead
 from .pooling_classifier import PoolingClassifierHead
