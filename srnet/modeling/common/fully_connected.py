@@ -40,8 +40,8 @@ class FullyConnectedSequence(Backbone):
         input_size: int,
         out_features: Sequence[str],
         layer_sizes: Sequence[int],
-        layer_activations: Sequence[str],
         layer_norms: Sequence[str],
+        layer_activations: Sequence[str],
         input_shape: Optional[ShapeSpec],
     ):
 
@@ -84,11 +84,6 @@ class FullyConnectedSequence(Backbone):
                 )
         self.out_features: List[str] = list(set(out_features))
 
-        # activations
-        assert len(layer_activations) == len(layer_sizes)
-        layer_activations = [a if a is not None else "" for a in layer_activations]
-        assert all(a in _ACTIVATION_TO_MODULE for a in layer_activations)
-
         # norms
         assert len(layer_norms) == len(layer_sizes)
         layer_norms = [norm if norm is not None else "" for norm in layer_norms]
@@ -98,14 +93,19 @@ class FullyConnectedSequence(Backbone):
             zip(itertools.chain([input_size], layer_sizes[:-1]), layer_sizes,)
         )
 
+        # activations
+        assert len(layer_activations) == len(layer_sizes)
+        layer_activations = [a if a is not None else "" for a in layer_activations]
+        assert all(a in _ACTIVATION_TO_MODULE for a in layer_activations)
+
         self.network = torch.nn.ModuleDict()
         self.network["flatten"] = torch.nn.Flatten()
         for i in range(0, len(size_pairs)):
             n_in_features, n_out_features = size_pairs[i]
-            act_class = _ACTIVATION_TO_MODULE[layer_activations[i]]
             norm_class = _NORM_TO_MODULE[layer_norms[i]]
+            act_class = _ACTIVATION_TO_MODULE[layer_activations[i]]
             block = self._build_block(
-                n_in_features, n_out_features, act_class, norm_class
+                n_in_features, n_out_features, norm_class, act_class,
             )
             self.network[f"block_{i}"] = block
 
@@ -113,8 +113,8 @@ class FullyConnectedSequence(Backbone):
         self,
         n_in_features: int,
         n_out_features: int,
-        activation_class: Type,
         norm_class: Type,
+        activation_class: Type,
     ) -> torch.nn.Module:
         # instantiate modules
         norm = norm_class(n_out_features)
@@ -142,7 +142,7 @@ class FullyConnectedSequence(Backbone):
             weight_init.c2_xavier_fill(linear)
 
         block = torch.nn.Sequential(
-            OrderedDict([("linear", linear), ("activation", act), ("norm", norm)])
+            OrderedDict([("linear", linear), ("norm", norm), ("activation", act)])
         )
         return block
 
@@ -186,7 +186,7 @@ class FullyConnectedSequence(Backbone):
             "input_size": node.INPUT_SIZE,
             "out_features": node.OUT_FEATURES,
             "layer_sizes": node.LAYER_SIZES,
-            "layer_activations": node.LAYER_ACTIVATIONS,
             "layer_norms": node.LAYER_NORMS,
+            "layer_activations": node.LAYER_ACTIVATIONS,
             "input_shape": input_shape,
         }
