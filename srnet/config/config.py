@@ -71,4 +71,23 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     # potential value(s): "" (no norm); "GN" (group norm)
     cfg.MODEL.IMAGE_DECODER.PREDICTOR_NORM = ""
 
+    # For FullyConnectedImageDecoder, the output height/width of the image.
+    # Note that the output number of channels is derived as len(cfg.MODEL.PIXEL_MEAN)
+    # Note also that the final output layer's size must equal output C*H*W.
+    cfg.MODEL.IMAGE_DECODER.OUTPUT_HEIGHT = -1
+    cfg.MODEL.IMAGE_DECODER.OUTPUT_WIDTH = -1
+    # for FullyConnectedImageDecoder, the number of hidden units in each layer
+    # of the image decoding network.
+    # potential value(s): [n0>=1, n1>=1, ..., nX>=1]
+    # Note that the final output layer's size (nX) must equal output C*H*W.
+    cfg.MODEL.IMAGE_DECODER.LAYER_SIZES = []
+    # for FullyConnectedImageDecoder, the normalization to use in each layer
+    # of the image decoding network.
+    # potential value(s): ["none" | "bn", ..., normX]
+    cfg.MODEL.IMAGE_DECODER.LAYER_NORMS = []
+    # for FullyConnectedImageDecoder, the activation function in each layer
+    # of the image decoding network.
+    # potential value(s): ["relu" | "sigmoid" | "tanh" | "identity", ..., actX]
+    cfg.MODEL.IMAGE_DECODER.LAYER_ACTIVATIONS = []
+
     return cfg

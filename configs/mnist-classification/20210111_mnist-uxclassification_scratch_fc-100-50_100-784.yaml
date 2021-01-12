@@ -12,7 +12,9 @@ MODEL:
   WEIGHTS: ""
   PIXEL_MEAN: [33.3184]
   PIXEL_STD: [78.5675]
-  META_ARCHITECTURE: "Classifier"
+  META_ARCHITECTURE: "UxClassifier"
+  UNSUPERVISED_OBJECTIVE:
+    NAME: "FullyConnectedImageDecoder"
   BACKBONE:
     NAME: "FullyConnectedBackbone"
   CLASSIFIER_HEAD:
@@ -25,6 +27,14 @@ MODEL:
     LAYER_SIZES: [100, 50]
     LAYER_NORMS: ["", ""]
     LAYER_ACTIVATIONS: ["relu", "relu"]
+  IMAGE_DECODER:
+    IN_FEATURES: ["out"]
+    LAYER_SIZES: [100, 784]
+    LAYER_NORMS: ["", ""]
+    LAYER_ACTIVATIONS: ["relu", "identity"]
+    OUTPUT_HEIGHT: 28
+    OUTPUT_WIDTH: 28
+
 DATASETS:
   TRAIN: ("mnist_train",)
   TEST: ("mnist_test",)
