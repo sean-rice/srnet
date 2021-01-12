@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from detectron2.config import configurable
 from detectron2.modeling.backbone import Backbone, build_backbone
@@ -10,6 +10,7 @@ from detectron2.utils.events import get_event_storage
 import torch
 
 from ..unsupervised.unsupervised_head import UnsupervisedHead, build_unsupervised_head
+from ..unsupervised.utils import preprocess_batch_order
 from .build import META_ARCH_REGISTRY
 
 __all__ = ["UxRCNN"]
@@ -239,10 +240,10 @@ class UxRCNN(torch.nn.Module):
 
     def _postprocess(
         self,
-        batched_inputs: List[Dict[str, Any]],
-        images_sizes: List[Tuple[int, int]],
-        detector_results: List[Optional[Instances]],
-        unsupervised_results: List[Optional[torch.Tensor]],
+        batched_inputs: Sequence[Dict[str, Any]],
+        images_sizes: Sequence[Tuple[int, int]],
+        detector_results: Sequence[Optional[Instances]],
+        unsupervised_results: Sequence[Optional[torch.Tensor]],
     ) -> List[Dict[str, Any]]:
         batched_inputs
         n_inputs = len(batched_inputs)
@@ -311,8 +312,9 @@ class UxRCNN(torch.nn.Module):
         std = self.pixel_std if std is None else std
         return (image * std) + mean
 
+    @classmethod
     def preprocess_batch_order(
-        self, batched_inputs: List[Dict[str, Any]]
+        cls, batched_inputs: List[Dict[str, Any]]
     ) -> Tuple[List[Dict[str, Any]], int, int, List[int]]:
         """
         Preprocesses an input batch's list order such that the unlabeled
@@ -338,17 +340,9 @@ class UxRCNN(torch.nn.Module):
                 sort (putting items back in their original order) at a later
                 stage.
         """
-        with torch.no_grad():
-            has_instances = torch.tensor(
-                [(1 if "instances" in inp else 0) for inp in batched_inputs],
-                dtype=torch.int,
-                device=torch.device("cpu"),
-            )
-            sorted_indices = [int(i.item()) for i in torch.argsort(has_instances)]
-            n_labeled = int(torch.sum(has_instances).item())
-            n_unlabeled = len(batched_inputs) - n_labeled
-            batched_inputs = [batched_inputs[i] for i in sorted_indices]
-        return batched_inputs, n_unlabeled, n_labeled, sorted_indices
+        return preprocess_batch_order(
+            batched_inputs, lambda example: 1 if "instances" in example else 0
+        )
 
     def visualize_training(self, *args, **kwargs):
         pass
