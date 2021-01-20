@@ -18,6 +18,7 @@ dependencies:
         - autoflake==1.4
         - black==19.10b0
         - debugpy==1.1.0
+        - foolbox==3.2.1
         - pycocotools==2.0.2
         - opencv-python==4.4.0.44
         - tabulate==0.8.7
