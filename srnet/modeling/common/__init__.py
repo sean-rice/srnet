@@ -1,1 +1,1 @@
-from . import fully_connected
+from . import fully_connected, types

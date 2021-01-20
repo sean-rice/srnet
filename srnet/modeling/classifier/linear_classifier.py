@@ -9,6 +9,7 @@ import torch.nn.init
 
 from srnet.utils._utils import find_cfg_node
 
+from ..common.types import Losses
 from .classifier_head import CLASSIFIER_HEAD_REGISTRY, ClassifierHead
 
 __all__ = ["LinearClassifierHead"]
@@ -75,12 +76,12 @@ class LinearClassifierHead(ClassifierHead):
 
     def forward(
         self, features: Dict[str, torch.Tensor], targets: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, Losses]:
         cls_scores: torch.Tensor = self.linear(
             features[self.in_feature]
         )  # (N, self.num_classes)
 
-        cls_losses: Dict[str, torch.Tensor] = {}
+        cls_losses: Losses = {}
         if self.training:
             assert targets is not None
             cls_loss = self.loss_weight * torch.nn.functional.cross_entropy(

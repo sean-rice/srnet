@@ -9,7 +9,14 @@ import torch
 
 from srnet.utils._utils import find_cfg_node
 
-from .unsupervised_head import UNSUPERVISED_HEAD_REGISTRY, UnsupervisedHead
+from ..common.types import Losses
+from .unsupervised_head import (
+    UNSUPERVISED_HEAD_REGISTRY,
+    UnsupervisedHead,
+    UnsupervisedOutput,
+)
+
+__all__ = ["ImageDecoder"]
 
 
 @UNSUPERVISED_HEAD_REGISTRY.register()
@@ -105,8 +112,8 @@ class ImageDecoder(UnsupervisedHead):
         self.predictor = torch.nn.Sequential(*predictor_ops)
 
     def forward(
-        self, features: Dict[str, torch.Tensor], targets: Dict[str, Any]
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        self, features: Dict[str, torch.Tensor], targets: Optional[Dict[str, Any]]
+    ) -> Tuple[UnsupervisedOutput, Losses]:
         """
         Decode a batch of feature embeddings back into images.
 
@@ -126,12 +133,15 @@ class ImageDecoder(UnsupervisedHead):
                 loss between the actual input images and the decoded
                 reconstructions.
         """
-        original_images: torch.Tensor = targets["images"].tensor  # ImageList -> Tensor
         decoded_images = self.layers(features)
 
-        results: Dict[str, torch.Tensor] = {"decoded_images": decoded_images}
-        losses: Dict[str, torch.Tensor] = {}
+        results: UnsupervisedOutput = {"decoded_images": decoded_images}
+        losses: Losses = {}
         if self.training:
+            assert targets is not None
+            original_images: torch.Tensor = targets[
+                "images"
+            ].tensor  # ImageList -> Tensor
             losses[self.loss_key] = (
                 torch.nn.functional.mse_loss(
                     decoded_images, original_images, reduction="mean"
@@ -189,7 +199,7 @@ class ImageDecoder(UnsupervisedHead):
 
     @classmethod
     def into_per_item_iterable(
-        cls, network_output: Dict[str, torch.Tensor]
+        cls, network_output: UnsupervisedOutput
     ) -> List[torch.Tensor]:
         return [img for img in network_output["decoded_images"]]
 

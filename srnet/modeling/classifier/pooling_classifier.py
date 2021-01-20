@@ -8,7 +8,10 @@ import torch.nn.functional
 
 from srnet.utils._utils import find_cfg_node
 
+from ..common.types import Losses
 from .classifier_head import CLASSIFIER_HEAD_REGISTRY, ClassifierHead
+
+__all__ = ["PoolingClassifierHead"]
 
 
 @CLASSIFIER_HEAD_REGISTRY.register()
@@ -85,7 +88,7 @@ class PoolingClassifierHead(ClassifierHead):
 
     def forward(
         self, features: Dict[str, torch.Tensor], targets: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, Losses]:
         pooled: torch.Tensor = self.pooler(features[self.in_feature])  # (N, C, 1, 1)
         pooled = pooled.squeeze()  # ([N?,] C)
         # if N == 1, it will get squeezed out; check for that (len(shape) == 1)
@@ -94,7 +97,7 @@ class PoolingClassifierHead(ClassifierHead):
             pooled = pooled.unsqueeze(dim=0)  # (1, C)
         cls_scores: torch.Tensor = self.fc(pooled)  # (N, self.num_classes)
 
-        cls_losses: Dict[str, torch.Tensor] = {}
+        cls_losses: Losses = {}
         if self.training:
             assert targets is not None
             cls_loss = self.loss_weight * torch.nn.functional.cross_entropy(

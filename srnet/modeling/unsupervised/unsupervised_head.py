@@ -1,13 +1,20 @@
 from abc import abstractmethod
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from detectron2.config import CfgNode
 from detectron2.layers import ShapeSpec
 from detectron2.utils.registry import Registry
 import torch
 
-__all__ = ["UNSUPERVISED_HEAD_REGISTRY", "UnsupervisedHead", "build_unsupervised_head"]
+from ..common.types import Losses
+
+__all__ = [
+    "UNSUPERVISED_HEAD_REGISTRY",
+    "UnsupervisedHead",
+    "UnsupervisedOutput",
+    "build_unsupervised_head",
+]
 
 UNSUPERVISED_HEAD_REGISTRY = Registry("UNSUPERVISED_HEAD")
 UNSUPERVISED_HEAD_REGISTRY.__doc__ = """
@@ -16,6 +23,8 @@ Take feature maps and return some target function.
 """
 
 logger = logging.getLogger(__name__)
+
+UnsupervisedOutput = Dict[str, torch.Tensor]
 
 
 class UnsupervisedHead(torch.nn.Module):
@@ -29,15 +38,24 @@ class UnsupervisedHead(torch.nn.Module):
     will probably have to disable typechecking for their signatures.
     """
 
+    __call__: Callable[..., Tuple[UnsupervisedOutput, Losses]]
+
     @classmethod
     @abstractmethod
     def from_config(cls, cfg: CfgNode, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         raise NotImplementedError()
 
+    def forward(
+        self,
+        features: Dict[str, torch.Tensor],
+        targets: Optional[Dict[str, torch.Tensor]],
+    ) -> Tuple[UnsupervisedOutput, Losses]:
+        raise NotImplementedError()
+
     @classmethod
     @abstractmethod
     def into_per_item_iterable(
-        cls, network_output: Dict[str, torch.Tensor]
+        cls, network_output: UnsupervisedOutput
     ) -> List[torch.Tensor]:
         raise NotImplementedError()
 

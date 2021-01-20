@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers import ShapeSpec
@@ -8,7 +8,14 @@ import torch.nn
 from srnet.modeling.common.fully_connected import FullyConnectedSequence
 from srnet.utils._utils import find_cfg_node
 
-from .unsupervised_head import UNSUPERVISED_HEAD_REGISTRY, UnsupervisedHead
+from ..common.types import Losses
+from .unsupervised_head import (
+    UNSUPERVISED_HEAD_REGISTRY,
+    UnsupervisedHead,
+    UnsupervisedOutput,
+)
+
+__all__ = ["FullyConnectedImageDecoder"]
 
 
 @UNSUPERVISED_HEAD_REGISTRY.register()
@@ -51,8 +58,8 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
         self.reshape = torch.nn.Unflatten(1, self.output_size)
 
     def forward(
-        self, features: Dict[str, torch.Tensor], targets: Dict[str, Any]
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        self, features: Dict[str, torch.Tensor], targets: Optional[Dict[str, Any]]
+    ) -> Tuple[UnsupervisedOutput, Losses]:
         """
         Decode a batch of feature embeddings back into images.
 
@@ -72,12 +79,15 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
                 loss between the actual input images and the decoded
                 reconstructions.
         """
-        original_images: torch.Tensor = targets["images"].tensor  # ImageList -> Tensor
         decoded_images = self.layers(features)
 
-        results: Dict[str, torch.Tensor] = {"decoded_images": decoded_images}
-        losses: Dict[str, torch.Tensor] = {}
+        results: UnsupervisedOutput = {"decoded_images": decoded_images}
+        losses: Losses = {}
         if self.training:
+            assert targets is not None
+            original_images: torch.Tensor = targets[
+                "images"
+            ].tensor  # ImageList -> Tensor
             losses[self.loss_key] = (
                 torch.nn.functional.mse_loss(
                     decoded_images, original_images, reduction="mean"

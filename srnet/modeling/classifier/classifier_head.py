@@ -1,11 +1,13 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from detectron2.config import CfgNode
 from detectron2.layers import ShapeSpec
 from detectron2.utils.registry import Registry
 import torch
+
+from ..common.types import Losses
 
 __all__ = ["CLASSIFIER_HEAD_REGISTRY", "ClassifierHead", "build_unsupervised_head"]
 
@@ -30,6 +32,8 @@ class ClassifierHead(torch.nn.Module, metaclass=ABCMeta):
     will probably have to disable typechecking for their signatures.
     """
 
+    __call__: Callable[..., Tuple[torch.Tensor, Losses]]
+
     _loss_weight_default: float = 1.0
     _loss_key_default: str = "loss_classifier"
 
@@ -47,7 +51,7 @@ class ClassifierHead(torch.nn.Module, metaclass=ABCMeta):
     @abstractmethod
     def forward(
         self, features: Dict[str, torch.Tensor], targets: Optional[torch.Tensor]
-    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, Losses]:
         raise NotImplementedError()
 
 
