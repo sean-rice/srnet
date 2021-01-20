@@ -14,7 +14,7 @@ __all__ = ["DefaultTrainer"]
 
 
 class DefaultTrainer(_D2DefaultTrainer):
-    # Based on detectron2.engine.defaults.DefaultTrainer.__init__ (commit 60d7a1f)
+    # Based on detectron2.engine.defaults.DefaultTrainer.__init__ (commit e7f1a69)
     def __init__(self, cfg, find_unused_parameters=False):
         """
         Args:
