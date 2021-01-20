@@ -37,3 +37,13 @@ def split_image_list(il: "ImageList", i: int, mode: str = ">=") -> "ImageList":
 
     split_list = ImageList(tensor, sizes)
     return split_list
+
+
+def repad_image_list(il: "ImageList", pad_value: float = 0.0, inplace: bool = True):
+    if inplace == False:
+        il = ImageList(il.tensor.clone().detach(), copy.deepcopy(il.image_sizes))
+    for i in range(len(il.image_sizes)):
+        h, w = il.image_sizes[i]
+        il.tensor[i, ..., h:, :] = pad_value
+        il.tensor[i, ..., :, w:] = pad_value
+    return il
