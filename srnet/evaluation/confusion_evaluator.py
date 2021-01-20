@@ -17,6 +17,8 @@ from fvcore.common.file_io import PathManager
 from tabulate import tabulate
 import torch
 
+__all__ = ["ConfusionMatrixDatasetEvaluator"]
+
 
 class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
     NAMES: Sequence[str] = ("predicted", "actual")
