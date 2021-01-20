@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers.shape_spec import ShapeSpec
@@ -7,7 +7,22 @@ from detectron2.structures import ImageList
 import torch
 
 from ..classifier.classifier_head import ClassifierHead, build_classifier_head
+from ..common.types import Losses
 from .build import META_ARCH_REGISTRY
+
+__all__ = ["ClassifierResult", "Classifier"]
+
+
+class ClassifierResult:
+    def __init__(
+        self,
+        class_scores: torch.Tensor,
+        losses: Losses,
+        extras: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.class_scores = class_scores
+        self.losses = losses
+        self.extras = {} if extras is None else extras
 
 
 @META_ARCH_REGISTRY.register()
@@ -86,19 +101,30 @@ class Classifier(torch.nn.Module):
 
         images = self.preprocess_image(batched_inputs)
         targets = self.preprocess_target(batched_inputs)
-        features: Dict[str, torch.Tensor] = self.backbone(images.tensor)
+        result: ClassifierResult = self.layers(images.tensor, targets)
+        return result.losses
+
+    def layers(
+        self, images: torch.Tensor, targets: Optional[torch.Tensor] = None,
+    ) -> ClassifierResult:
+        """
+        Returns:
+            result (ClassifierResult)
+        """
+        features: Dict[str, torch.Tensor] = self.backbone(images)
+        class_scores: torch.Tensor
         classifier_losses: Dict[str, torch.Tensor]
-        _, classifier_losses = self.classifier_head(features, targets=targets)
-        return classifier_losses
+        class_scores, classifier_losses = self.classifier_head(
+            features, targets=targets
+        )
+        return ClassifierResult(class_scores, classifier_losses)
 
     def inference(
         self, batched_inputs: List[Dict[str, Any]], normalize: bool = True
     ) -> List[Dict[str, Any]]:
-        images = self.preprocess_image(batched_inputs)
-        features: Dict[str, torch.Tensor] = self.backbone(images.tensor)
-        class_scores: torch.Tensor
-        class_scores, _ = self.classifier_head(features)
-        return [{"pred_class_scores": scores} for scores in class_scores]
+        images = self.preprocess_image(batched_inputs, normalize)
+        result: ClassifierResult = self.layers(images.tensor)
+        return [{"pred_class_scores": scores} for scores in result.class_scores]
 
     def preprocess_image(
         self, batched_inputs: List[Dict[str, Any]], normalize: bool = True
@@ -143,3 +169,14 @@ class Classifier(torch.nn.Module):
         mean = self.pixel_mean if mean is None else mean
         std = self.pixel_std if std is None else std
         return (image * std) + mean
+
+    def _patch_forward(self, new_forward: Optional[Callable] = None) -> "Classifier":
+        # store the true original forward (once only)
+        self._forward_original = getattr(self, "_forward_original", self.forward)
+        if new_forward is None:
+            # restore original forward
+            self.forward = self._forward_original  # type: ignore[assignment]
+        else:
+            # overwrite forward
+            self.forward = new_forward  # type: ignore[assignment]
+        return self

@@ -1,22 +1,27 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers.shape_spec import ShapeSpec
-from detectron2.modeling.backbone import Backbone, build_backbone
-from detectron2.structures import ImageList
+from detectron2.modeling.backbone import Backbone
 import torch
 
-from ..classifier.classifier_head import ClassifierHead, build_classifier_head
-from ..unsupervised.unsupervised_head import UnsupervisedHead, build_unsupervised_head
+from ..classifier.classifier_head import ClassifierHead
+from ..common.types import Losses
+from ..unsupervised.unsupervised_head import (
+    UnsupervisedHead,
+    UnsupervisedOutput,
+    build_unsupervised_head,
+)
 from ..unsupervised.utils import preprocess_batch_order
 from .build import META_ARCH_REGISTRY
+from .classifier import Classifier, ClassifierResult
 
 
 @META_ARCH_REGISTRY.register()
-class UxClassifier(torch.nn.Module):
+class UxClassifier(Classifier):
     """
-    An Unsupervised eXtended classifier network, composed of a backbone, an
-    unsupervised objective head, and a (supervised) classifier head.
+    An Unsupervised eXtended classifier network, composed of a backbone, a
+    supervised classifier head, and an unsupervised objective head.
     """
 
     @configurable
@@ -31,51 +36,29 @@ class UxClassifier(torch.nn.Module):
         input_format: Optional[str] = None,
         vis_period: int = 0,
     ):
-        super().__init__()
+        super().__init__(backbone, classifier_head, pixel_mean, pixel_std, input_format)
 
-        assert backbone is not None
-        assert classifier_head is not None
         assert unsupervised_head is not None
-
-        self.backbone: Backbone = backbone
-        self.classifier_head: ClassifierHead = classifier_head
         self.unsupervised_head: UnsupervisedHead = unsupervised_head
 
-        self.input_format: Optional[str] = input_format
         self.vis_period = vis_period
         if vis_period > 0:
             assert (
                 input_format is not None
             ), "input_format is required for visualization!"
 
-        self.pixel_mean: torch.Tensor
-        self.register_buffer("pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1))
-        self.pixel_std: torch.Tensor
-        self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1))  # type: ignore[call-arg]
-
     @classmethod
     def from_config(cls, cfg: CfgNode) -> Dict[str, Any]:
-        backbone: Backbone = build_backbone(cfg)
-        out_shape: Dict[str, ShapeSpec] = backbone.output_shape()
-        classifier_head = build_classifier_head(cfg, out_shape)
+        args: Dict[str, Any] = super().from_config(cfg)
+        out_shape: Dict[str, ShapeSpec] = args["backbone"].output_shape()
         unsupervised_head = build_unsupervised_head(cfg, out_shape)
-        return {
-            "backbone": backbone,
-            "classifier_head": classifier_head,
-            "unsupervised_head": unsupervised_head,
-            "pixel_mean": cfg.MODEL.PIXEL_MEAN,
-            "pixel_std": cfg.MODEL.PIXEL_STD,
-            "input_format": cfg.INPUT.FORMAT,
-            "vis_period": cfg.VIS_PERIOD,
-        }
-
-    @property
-    def device(self) -> torch.device:
-        return self.pixel_mean.device
+        args["unsupervised_head"] = unsupervised_head
+        args["vis_period"] = cfg.VIS_PERIOD
+        return args
 
     def forward(
         self, batched_inputs: List[Dict[str, Any]], normalize: bool = True
-    ) -> Union[List[Dict[str, Any]], Dict[str, torch.Tensor]]:
+    ) -> Union[List[Dict[str, Any]], Losses]:
         """
         Args:
             batched_inputs (List[Dict[str, Any]]): a list, batched outputs of
@@ -100,55 +83,53 @@ class UxClassifier(torch.nn.Module):
         if not self.training:
             return self.inference(batched_inputs, normalize)
 
-        images = self.preprocess_image(batched_inputs)
+        images = self.preprocess_image(batched_inputs, normalize)
         targets = self.preprocess_target(batched_inputs)
-        features: Dict[str, torch.Tensor] = self.backbone(images.tensor)
 
-        losses: Dict[str, torch.Tensor] = {}
-        classifier_losses: Dict[str, torch.Tensor]
-        _, classifier_losses = self.classifier_head(features, targets=targets)
-
-        unsupervised_losses: Dict[str, torch.Tensor]
-        _, unsupervised_losses = self.unsupervised_head(
-            features, {"inputs": batched_inputs, "images": images}
+        results: ClassifierResult = self.layers(
+            images, targets, unsup_targets={"inputs": batched_inputs, "images": images}
         )
+        return results.losses
+
+    def layers(
+        self,
+        images: torch.Tensor,
+        targets: Optional[torch.Tensor] = None,
+        unsup_targets: Optional[Dict[str, Any]] = None,
+    ) -> ClassifierResult:
+        features: Dict[str, torch.Tensor] = self.backbone(images)
+        class_scores: torch.Tensor
+        classifier_losses: Losses
+        class_scores, classifier_losses = self.classifier_head(
+            features, targets=targets
+        )
+        unsupervised_output: UnsupervisedOutput
+        unsupervised_losses: Losses
+        unsupervised_output, unsupervised_losses = self.unsupervised_head(
+            features, unsup_targets
+        )
+
+        losses: Losses = {}
         losses.update(classifier_losses)
         losses.update(unsupervised_losses)
-        return losses
+        return ClassifierResult(
+            class_scores, losses, {"unsupervised_output": unsupervised_output}
+        )
 
     def inference(
-        self,
-        batched_inputs: List[Dict[str, Any]],
-        do_unsupervised: bool = True,
-        do_postprocess: bool = True,
+        self, batched_inputs: List[Dict[str, Any]], do_postprocess: bool = True,
     ) -> List[Dict[str, Any]]:
         images = self.preprocess_image(batched_inputs)
-        features: Dict[str, torch.Tensor] = self.backbone(images.tensor)
-
-        class_scores_results: Optional[List[torch.Tensor]]
-        if isinstance(self.classifier_head, torch.nn.Module):
-            class_scores_raw, _ = self.classifier_head(features)
-            class_scores_results = [scores for scores in class_scores_raw]
-        else:
-            class_scores_results = None
-
-        unsupervised_results: Optional[List[torch.Tensor]] = None
-        if do_unsupervised == True and isinstance(
-            self.unsupervised_head, torch.nn.Module
-        ):
-            unsup_results_raw, _ = self.unsupervised_head(
-                features, {"inputs": batched_inputs, "images": images}
-            )
-            unsupervised_results = self.unsupervised_head.into_per_item_iterable(
-                unsup_results_raw
-            )
+        classifier_results: ClassifierResult = self.layers(
+            images, targets=None, unsup_targets=None
+        )
 
         if do_postprocess == True:
             results = self._postprocess(
                 batched_inputs,
                 images.image_sizes,
-                class_scores_results,
-                unsupervised_results,
+                cast(Sequence[torch.Tensor], classifier_results.class_scores),
+                classifier_results.extras["unsupervised_output"],
             )
             return results
         else:
@@ -159,16 +140,23 @@ class UxClassifier(torch.nn.Module):
         batched_inputs: Sequence[Dict[str, Any]],
         images_sizes: Sequence[Tuple[int, int]],
         classifier_results: Optional[Sequence[Optional[torch.Tensor]]],
-        unsupervised_results: Optional[Sequence[Optional[torch.Tensor]]],
+        unsupervised_output: Optional[UnsupervisedOutput],
     ) -> List[Dict[str, Any]]:
+
         n_inputs = len(batched_inputs)
 
-        if classifier_results is None or unsupervised_results is None:
+        unsupervised_items: Optional[Sequence[Optional[torch.Tensor]]] = None
+        if unsupervised_output is not None:
+            unsupervised_items = self.unsupervised_head.into_per_item_iterable(
+                unsupervised_output
+            )
+
+        if classifier_results is None or unsupervised_items is None:
             nones = (None,) * n_inputs
             if classifier_results is None:
                 classifier_results = nones
-            if unsupervised_results is None:
-                unsupervised_results = nones
+            if unsupervised_items is None:
+                unsupervised_items = nones
 
         if n_inputs != len(images_sizes):
             raise ValueError(f"length mismatch; {n_inputs=} but {len(images_sizes)=}")
@@ -176,9 +164,9 @@ class UxClassifier(torch.nn.Module):
             raise ValueError(
                 f"length mismatch; {n_inputs=} but {len(classifier_results)=}"
             )
-        if n_inputs != len(unsupervised_results):
+        if n_inputs != len(unsupervised_items):
             raise ValueError(
-                f"length mismatch; {n_inputs=} but {len(unsupervised_results)=}"
+                f"length mismatch; {n_inputs=} but {len(unsupervised_items)=}"
             )
 
         results: List[Dict[str, Any]] = [{} for _ in range(n_inputs)]
@@ -186,7 +174,7 @@ class UxClassifier(torch.nn.Module):
             image_input = batched_inputs[i]
             image_size = images_sizes[i]
             image_class_scores = classifier_results[i]
-            image_unsup_result = unsupervised_results[i]
+            image_unsup_result = unsupervised_items[i]
 
             h: int = image_input.get("height", image_size[0])
             w: int = image_input.get("width", image_size[1])
@@ -198,50 +186,6 @@ class UxClassifier(torch.nn.Module):
                 )
                 results[i]["unsupervised"] = u
         return results
-
-    def preprocess_image(
-        self, batched_inputs: List[Dict[str, Any]], normalize: bool = True
-    ) -> ImageList:
-        """
-        Preprocess the input images, including normalization, padding, and
-        batching.
-        """
-        images: List[torch.Tensor] = [
-            x["image"].to(self.device) for x in batched_inputs
-        ]
-        if normalize == True:
-            images = [self._normalize(x) for x in images]
-        image_list = ImageList.from_tensors(images)
-        return image_list
-
-    def preprocess_target(self, batched_inputs: List[Dict[str, Any]]) -> torch.Tensor:
-        """
-        Preprocess the input items into a tensor of target classes.
-        """
-        targets: torch.Tensor = torch.stack(
-            [item["class_label"] for item in batched_inputs]
-        ).to(device=self.device, dtype=torch.long)
-        return targets
-
-    def _normalize(
-        self,
-        image: torch.Tensor,
-        mean: Optional[torch.Tensor] = None,
-        std: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        mean = self.pixel_mean if mean is None else mean
-        std = self.pixel_std if std is None else std
-        return (image - mean) / std
-
-    def _denormalize(
-        self,
-        image: torch.Tensor,
-        mean: Optional[torch.Tensor] = None,
-        std: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        mean = self.pixel_mean if mean is None else mean
-        std = self.pixel_std if std is None else std
-        return (image * std) + mean
 
     @classmethod
     def preprocess_batch_order(
