@@ -8,7 +8,7 @@ from srnet.utils.image_list import repad_image_list
 
 
 class TestImageListUtils(unittest.TestCase):
-    def _test_repad_no_channels(self, test_with_inplace: bool):
+    def _test_repad_no_channels(self, test_with_inplace: bool) -> None:
         cpu = torch.device("cpu")
         t1: torch.Tensor = torch.rand((3, 3), device=cpu)
         t2: torch.Tensor = torch.rand((5, 5), device=cpu)
@@ -32,13 +32,13 @@ class TestImageListUtils(unittest.TestCase):
         else:
             self.assertFalse(same_backing_tensor)
 
-    def test_repad_no_channels(self):
+    def test_repad_no_channels(self) -> None:
         self._test_repad_no_channels(test_with_inplace=False)
 
-    def test_repad_no_channels_inplace(self):
+    def test_repad_no_channels_inplace(self) -> None:
         self._test_repad_no_channels(test_with_inplace=True)
 
-    def _test_repad_c_channels(self, c: int, test_with_inplace: bool):
+    def _test_repad_c_channels(self, c: int, test_with_inplace: bool) -> None:
         cpu = torch.device("cpu")
         t1: torch.Tensor = torch.rand((c, 3, 3), device=cpu)
         t2: torch.Tensor = torch.rand((c, 5, 5), device=cpu)
@@ -62,28 +62,28 @@ class TestImageListUtils(unittest.TestCase):
         else:
             self.assertFalse(same_backing_tensor)
 
-    def test_repad_1_channel(self):
+    def test_repad_1_channel(self) -> None:
         self._test_repad_c_channels(c=1, test_with_inplace=False)
 
-    def test_repad_1_channel_inplace(self):
+    def test_repad_1_channel_inplace(self) -> None:
         self._test_repad_c_channels(c=1, test_with_inplace=True)
 
-    def test_repad_2_channels(self):
+    def test_repad_2_channels(self) -> None:
         self._test_repad_c_channels(c=2, test_with_inplace=False)
 
-    def test_repad_2_channels_inplace(self):
+    def test_repad_2_channels_inplace(self) -> None:
         self._test_repad_c_channels(c=2, test_with_inplace=True)
 
-    def test_repad_3_channels(self):
+    def test_repad_3_channels(self) -> None:
         self._test_repad_c_channels(c=2, test_with_inplace=False)
 
-    def test_repad_3_channels_inplace(self):
+    def test_repad_3_channels_inplace(self) -> None:
         self._test_repad_c_channels(c=2, test_with_inplace=True)
 
-    def test_repad_many_channels(self):
+    def test_repad_many_channels(self) -> None:
         for c in range(4, 11):
             self._test_repad_c_channels(c=c, test_with_inplace=False)
 
-    def test_repad_many_channels_inplace(self):
+    def test_repad_many_channels_inplace(self) -> None:
         for c in range(4, 11):
             self._test_repad_c_channels(c=c, test_with_inplace=True)
