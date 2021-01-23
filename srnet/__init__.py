@@ -1,3 +1,6 @@
+from . import config, data, engine, evaluation, foolbox, modeling, tools, utils
+
+
 def merge_with_detectron2():
     """
     Modifies the mutable parts of detectron2's modules/environment (such as
