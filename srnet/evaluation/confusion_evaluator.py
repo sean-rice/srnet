@@ -1,14 +1,7 @@
 from collections import OrderedDict
 import logging
 import os
-from typing import (  # type: ignore[misc]
-    Any,
-    Dict,
-    List,
-    Optional,
-    OrderedDict,
-    Sequence,
-)
+from typing import Any, Dict, List, Optional, Sequence
 
 from detectron2.data import Metadata
 from detectron2.evaluation import DatasetEvaluator
@@ -62,7 +55,7 @@ class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
             predicted_class: int = int(torch.argmax(output["pred_class_scores"]).item())
             self._cm[predicted_class, actual_class] += 1
 
-    def evaluate(self, max_table_size: int = 25) -> OrderedDict[str, Dict[str, Any]]:
+    def evaluate(self, max_table_size: int = 25) -> "OrderedDict[str, Dict[str, Any]]":
         # if distributed, gather and sum confusion matrices
         cm: torch.Tensor
         if self._distributed:
