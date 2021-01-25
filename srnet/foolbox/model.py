@@ -30,7 +30,7 @@ class FlexiblePyTorchModel(foolbox.PyTorchModel):
         self._pytorch_module = model
         self._stored_call_args: Dict[str, Any] = {}
 
-    def store_call_args(self, /, strict: bool, **args: Dict[str, Any]) -> None:
+    def store_call_args(self, /, strict: bool, **args) -> None:
         if strict == False:
             self._stored_call_args.update(args)
         else:
