@@ -18,6 +18,7 @@ class AccuracyDatasetEvaluator(DatasetEvaluator):
         distributed: bool = True,
         output_dir: Optional[str] = None,
     ) -> None:
+        assert len(top_ks) >= 1
         self._logger: logging.Logger = logging.getLogger(__name__)
         self._distributed: bool = distributed
         self._output_dir: Optional[str] = output_dir
@@ -35,7 +36,7 @@ class AccuracyDatasetEvaluator(DatasetEvaluator):
     ) -> None:
         """
         Args:
-            inputs: the inputs to a :class:`Classifier`-like model.
+            inputs: the mapped inputs to a :class:`Classifier`-like model.
                 It is a list of dict. Each dict corresponds to an image and
                 contains keys like "height", "width", "file_name", "image_id".
             outputs: the outputs of a :class:`Classifier`-like model. It is a
@@ -66,16 +67,16 @@ class AccuracyDatasetEvaluator(DatasetEvaluator):
         # if distributed, gather and sum correct answers
         if self._distributed:
             comm.synchronize()
-            correct_in_top_k = {k: 0 for k in self.top_ks}
             totals: List[int] = comm.gather(self.total, dst=0)
-            cms: List[Dict[int, int]] = comm.gather(self.correct_in_top_k, dst=0)
+            citks: List[Dict[int, int]] = comm.gather(self.correct_in_top_k, dst=0)
             if not comm.is_main_process():
                 return OrderedDict()
             else:
+                correct_in_top_k = {k: 0 for k in self.top_ks}
                 total = sum(totals)
                 # merge count dictionaries
-                for d in cms:
-                    for k, count in d.items():
+                for d_citk in citks:
+                    for k, count in d_citk.items():
                         correct_in_top_k[k] += count
         else:
             total = self.total
