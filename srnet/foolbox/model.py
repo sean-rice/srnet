@@ -30,26 +30,26 @@ class FlexiblePyTorchModel(foolbox.PyTorchModel):
         self._pytorch_module = model
         self._stored_call_args: Dict[str, Any] = {}
 
-    def store_call_args(self, /, strict: bool, **args) -> None:
+    def store_call_args(self, /, strict: bool, **kwargs: Any) -> None:
         if strict == False:
-            self._stored_call_args.update(args)
+            self._stored_call_args.update(kwargs)
         else:
-            for k, v in args.items():
+            for k, v in kwargs.items():
                 if k in self._stored_call_args:
                     raise ValueError(f"can't store call arg {k}; already present!")
                 self._stored_call_args[k] = v
         self._update_model_call()
 
     def unstore_call_args(
-        self, strict: bool = False, args: Optional[Set[Any]] = None
+        self, strict: bool = False, arguments: Optional[Set[Any]] = None
     ) -> None:
-        if args is None:
+        if arguments is None:
             self._stored_call_args.clear()
         elif strict == False:
-            for k in args:
+            for k in arguments:
                 self._stored_call_args.pop(k, None)
         else:
-            for k in args:
+            for k in arguments:
                 self._stored_call_args.pop(k)
         self._update_model_call()
 
