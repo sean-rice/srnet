@@ -14,6 +14,8 @@ from ._catalog import SRNET_DATASET_CATALOG, SRNET_METADATA_CATALOG
 
 _MNIST_LABEL_MAP: Dict[str, int] = {label: i for i, label in enumerate(MNIST.classes)}
 
+__all__ = ["register_mnist"]
+
 
 def _make_mnist_dicts(
     id_base: str,
