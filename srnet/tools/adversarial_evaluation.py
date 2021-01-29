@@ -8,7 +8,7 @@ from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.data import MapDataset, get_detection_dataset_dicts
 from detectron2.data.samplers import InferenceSampler
-from detectron2.engine import default_argument_parser, default_setup, launch
+from detectron2.engine import default_argument_parser, launch
 from detectron2.evaluation import inference_on_dataset, verify_results
 import detectron2.utils.comm as comm
 import foolbox
@@ -22,22 +22,9 @@ from srnet.evaluation.foolbox_evaluator import FoolboxAccuracyDatasetEvaluator
 from srnet.foolbox.model import FlexiblePyTorchModel
 from srnet.foolbox.wrappers.classifier import FoolboxWrappedClassifier
 
-from .train import Trainer
+from ._common import Trainer, setup, remove_arg
 
-
-def setup(args):
-    """
-    Create configs and perform basic setups.
-    """
-    srnet.merge_with_detectron2()
-    cfg = get_cfg()
-    cfg = add_srnet_config(cfg)
-    cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-    default_setup(cfg, args)
-    return cfg
-
+__all__ = ["main", "get_aversarial_argument_parser", "run"]
 
 def main(args):
     cfg = setup(args)
@@ -108,37 +95,23 @@ def _parse_tuple(tuple_str: str, cast: Optional[Callable] = None) -> Tuple[Any, 
     return t
 
 
-def _remove_arg(args: argparse.ArgumentParser, option: str) -> argparse.ArgumentParser:
-    """
-    Removes an argument from an `ArgumentParser`.
-
-    Note: uses a non-public behavior of the `argparse` API.
-    """
-    args = copy.deepcopy(args)
-    action = list(filter(lambda a: option in a.option_strings, args._actions))[0]
-    args._handle_conflict_resolve(None, [(option, action)])  # type: ignore[arg-type]
-    return args
-
-
-def _get_args() -> argparse.Namespace:
-    ap: argparse.ArgumentParser = default_argument_parser()
-    ap = _remove_arg(ap, "--eval-only")
+def add_adversarial_arguments(ap: argparse.ArgumentParser) -> argparse.ArgumentParser:
     ap.add_argument(
         "--adversarial-output-dir",
         default=None,
-        help="where to output the adversarial evaluation.",
+        help="where to output the adversarial evaluation. if None, uses OUTPUTDIR/inference. default: %(default)s",
     )
     ap.add_argument(
         "--adversarial-epsilons",
         type=lambda s: _parse_tuple(s, cast=float),
         default=(2.0, 8.0, 16.0),
-        help="the epsilons (perturbation budget) to attack with.",
+        help="the epsilons (perturbation budgets) to attack with.",
     )
     ap.add_argument(
         "--adversarial-steps",
         type=int,
         default=40,
-        help="the number of steps the adversary can take.",
+        help="the number of steps the adversary can take. default: %(default)s",
     )
     ap.add_argument(
         "--adversarial-batch-size",
@@ -146,13 +119,19 @@ def _get_args() -> argparse.Namespace:
         default=0,
         help="the batch size to use. if nonpositive, uses config. default: %(default)s",
     )
+    return ap
+
+def _get_args() -> argparse.Namespace:
+    ap: argparse.ArgumentParser = default_argument_parser()
+    ap = remove_arg(ap, "--eval-only")
+    ap = add_adversarial_arguments(ap)
     args: argparse.Namespace = ap.parse_args()
     args.eval_only = True
     return args
 
-
-if __name__ == "__main__":
-    args: argparse.Namespace = _get_args()
+def run(args: Optional[argparse.Namespace]=None) -> None:
+    if args is None:
+        args = _get_args()
     print("Command Line Args:", args)
     launch(
         main,
@@ -162,3 +141,7 @@ if __name__ == "__main__":
         dist_url=args.dist_url,
         args=(args,),
     )
+
+
+if __name__ == "__main__":
+    run()
