@@ -35,7 +35,7 @@ import torch
 import srnet
 from srnet.config import add_srnet_config
 from srnet.engine.defaults import DefaultTrainer as SrDefaultTrainer
-from srnet.evaluation import ConfusionMatrixDatasetEvaluator
+from srnet.evaluation import AccuracyDatasetEvaluator, ConfusionMatrixDatasetEvaluator
 
 
 class Trainer(SrDefaultTrainer):
@@ -84,6 +84,14 @@ class Trainer(SrDefaultTrainer):
             return PascalVOCDetectionEvaluator(dataset_name)
         elif evaluator_type == "lvis":
             return LVISEvaluator(dataset_name, cfg, True, output_folder)
+        elif evaluator_type == "classifier_accuracy":
+            return AccuracyDatasetEvaluator(
+                top_ks=getattr(
+                    MetadataCatalog.get(dataset_name), "accuracy_top_ks", (1,)
+                ),
+                distrubted=True,
+                output_dir=output_folder,
+            )
         elif evaluator_type == "confusion_matrix":
             return ConfusionMatrixDatasetEvaluator(
                 num_classes=cfg.MODEL.CLASSIFIER_HEAD.NUM_CLASSES,
