@@ -36,7 +36,13 @@ class UxClassifier(Classifier):
         input_format: Optional[str] = None,
         vis_period: int = 0,
     ):
-        super().__init__(backbone, classifier_head, pixel_mean, pixel_std, input_format)
+        super().__init__(
+            backbone=backbone,
+            classifier_head=classifier_head,
+            pixel_mean=pixel_mean,
+            pixel_std=pixel_std,
+            input_format=input_format,
+        )
 
         assert unsupervised_head is not None
         self.unsupervised_head: UnsupervisedHead = unsupervised_head
@@ -87,7 +93,9 @@ class UxClassifier(Classifier):
         targets = self.preprocess_target(batched_inputs)
 
         results: ClassifierResult = self.layers(
-            images, targets, unsup_targets={"inputs": batched_inputs, "images": images}
+            images.tensor,
+            targets,
+            unsup_targets={"inputs": batched_inputs, "images": images},
         )
         return results.losses
 
@@ -121,7 +129,7 @@ class UxClassifier(Classifier):
     ) -> List[Dict[str, Any]]:
         images = self.preprocess_image(batched_inputs)
         classifier_results: ClassifierResult = self.layers(
-            images, targets=None, unsup_targets=None
+            images.tensor, targets=None, unsup_targets=None
         )
 
         if do_postprocess == True:
