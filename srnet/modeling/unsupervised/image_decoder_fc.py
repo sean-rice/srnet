@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers import ShapeSpec
@@ -39,6 +39,7 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
         output_shape: Sequence[int],
         loss_weight: float,
         loss_key: str = "loss_image_decoder",
+        output_key: str = "decoded_images",
     ):
         super(UnsupervisedHead, self).__init__()
 
@@ -46,6 +47,7 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
         self.output_size: torch.Size = torch.Size(output_shape)
         self.loss_weight: float = loss_weight
         self.loss_key: str = loss_key
+        self.output_key: str = output_key
 
         self.network = FullyConnectedSequence(
             input_shape[in_feature].width,
@@ -71,7 +73,7 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
                 `ImageList`.
             
         Returns:
-            results (dict): A dict containing a single key, `"decoded_images"`,
+            results (dict): A dict containing a single key, `self.output_key`,
                 with a value of type `torch.Tensor` containing the decoded
                 images in standard torch.Size([N,C,H,W]) format.
             losses (dict): In inference, an empty dict. In training, a dict
@@ -81,7 +83,7 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
         """
         decoded_images = self.layers(features)
 
-        results: UnsupervisedOutput = {"decoded_images": decoded_images}
+        results: UnsupervisedOutput = {self.output_key: decoded_images}
         losses: Losses = {}
         if self.training:
             assert targets is not None
@@ -136,13 +138,13 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
             ),
             "loss_weight": target_node.LOSS_WEIGHT,
             "loss_key": target_node.LOSS_KEY,
+            "output_key": target_node.OUTPUT_KEY,
         }
 
-    @classmethod
     def into_per_item_iterable(
-        cls, network_output: Dict[str, torch.Tensor]
+        self, network_output: Dict[str, torch.Tensor]
     ) -> List[torch.Tensor]:
-        return [img for img in network_output["decoded_images"]]
+        return [img for img in network_output[self.output_key]]
 
     @classmethod
     def postprocess(  # type: ignore[override]
@@ -175,3 +177,11 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
             align_corners=False,
         )[0]
         return result
+
+    @property
+    def loss_keys(self) -> Set[str]:
+        return {self.loss_key}
+
+    @property
+    def output_keys(self) -> Set[str]:
+        return {self.output_key}

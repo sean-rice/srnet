@@ -45,9 +45,17 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     cfg.MODEL.UNSUPERVISED_OBJECTIVE = CfgNode()
     cfg.MODEL.UNSUPERVISED_OBJECTIVE.NAME = ""
 
+    cfg.MODEL.MULTI_UNSUPERVISED_OBJECTIVE = CfgNode()
+    # a list of Tuple[str, str, str] representing:
+    # (head_name_1, objective_type_1, node_path_1)
+    cfg.MODEL.MULTI_UNSUPERVISED_OBJECTIVE.OBJECTIVES_LIST = []
+    # an optional space to store configuration for
+    cfg.MODEL.MULTI_UNSUPERVISED_OBJECTIVE.OBJECTIVES = CfgNode(new_allowed=True)
+
     cfg.MODEL.IMAGE_DECODER = CfgNode()
     cfg.MODEL.IMAGE_DECODER.LOSS_WEIGHT = 1.0
     cfg.MODEL.IMAGE_DECODER.LOSS_KEY = "loss_image_decoder"  # _type: Optional[str]
+    cfg.MODEL.IMAGE_DECODER.OUTPUT_KEY = "decoded_images"
     # Features from the backbone to use as input
     # potential value(s): ["p2", "p3", "p4", "p5"]
     cfg.MODEL.IMAGE_DECODER.IN_FEATURES = None
