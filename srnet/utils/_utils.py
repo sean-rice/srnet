@@ -89,12 +89,15 @@ def find_cfg_node(cfg: CfgNode, node_path: str) -> CfgNode:
     Args:
         cfg (CfgNode): The root configuration node to search.
         node_path (str): The name of the desired node to be returned. For
-            example, `"MODEL.CLASSIFIER_HEAD"`.
+            example, `"MODEL.CLASSIFIER_HEAD"`. If empty string, returns the
+            configuration node passed in.
     
     Returns:
         target_node (CfgNode): The `CfgNode` child of the `cfg` corresponding 
             to the provided `node_path`.
     """
+    if node_path == "":
+        return cfg
     node_names = node_path.split(".")
     target_node = cfg
     for next_node in node_names:
