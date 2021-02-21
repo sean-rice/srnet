@@ -8,6 +8,7 @@ from detectron2.utils import comm
 from detectron2.utils.logger import setup_logger
 from torch.nn.parallel import DistributedDataParallel
 
+from ..data.augmentation.build import build_augmentations_from_cfg
 from ..data.dataset_mappers import SrnetDatasetMapper
 
 __all__ = ["DefaultTrainer"]
@@ -72,7 +73,9 @@ class DefaultTrainer(_D2DefaultTrainer):
         the custom `srnet` datset mapper `SrnetDatasetMapper` substituted.
         """
         if True:
-            mapper = SrnetDatasetMapper(cfg, True, augmentation_builder=None)
+            mapper = SrnetDatasetMapper(
+                cfg, True, augmentation_builder=build_augmentations_from_cfg
+            )
             return build_detection_train_loader(cfg, mapper=mapper)
         else:
             return super().build_train_loader(cfg)
@@ -87,6 +90,9 @@ class DefaultTrainer(_D2DefaultTrainer):
         the custom `srnet` datset mapper `SrnetDatasetMapper` substituted.
         """
         if True:
-            mapper = SrnetDatasetMapper(cfg, False, augmentation_builder=None)
+            mapper = SrnetDatasetMapper(
+                cfg, False, augmentation_builder=build_augmentations_from_cfg
+            )
             return build_detection_test_loader(cfg, dataset_name, mapper=mapper)
-        return super().build_test_loader(cfg, dataset_name)
+        else:
+            return super().build_test_loader(cfg, dataset_name)

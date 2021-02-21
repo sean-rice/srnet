@@ -140,9 +140,8 @@ class SrnetDatasetMapper(DatasetMapper):
         is_train: bool = True,
         augmentation_builder: Optional[Callable] = None,
     ) -> Dict[str, Any]:
-        # initialize self exactly as before,
+        # initialize as before
         args = super().from_config(cfg, is_train=is_train)
-
         # but replace the augmentations with our own
         if augmentation_builder is not None:
             args["augmentations"] = augmentation_builder(cfg, is_train)
