@@ -1,0 +1,96 @@
+INPUT:
+  FORMAT: "RGB" # srnet loads cifar10 as rgb by default
+  RANDOM_FLIP: "none"
+  # unused (disabled via EXTRAS: "none")
+  MIN_SIZE_TRAIN: [32]
+  MAX_SIZE_TRAIN: 32
+  MIN_SIZE_TEST: 32
+  MAX_SIZE_TEST: 32
+  # common cifar-10 aug pipeline
+  AUG:
+    CUSTOM:
+      TRAIN:
+        ENABLED: True
+        EXTRAS: "none"
+        # fb.resnet.torch normalizes first:
+        # https://github.com/facebookarchive/fb.resnet.torch/blob/master/datasets/cifar10.lua#L43
+        # but this repo normalizes last:
+        # https://github.com/kuangliu/pytorch-cifar/blob/7941bebc1207af338a98eb7cd32aa58582d8d003/main.py#L30
+        # since normalization is a part of the model forward in detectron2,
+        # it must be truly last. if the padded values should be zero
+        # *post normalization*, (e.g. random crop with zero-padding step comes
+        # after normalization), the padding value used when it is *before*
+        # normalization should be MODEL.PIXEL_MEAN. Then it's subtracted out
+        # and becomes zero during normalization-post-pad&crop.
+        SEQUENCE: [
+          {
+            "NAME": "TransformWrapper",
+            "ARGS": {
+              "_TRANSFORM_NAME": "PadTransform",
+              "top": 4, "bottom": 4, "left": 4, "right": 4,
+              "padding_image": 0
+            }
+          },
+          {
+            "NAME": "RandomCrop",
+            "ARGS": {
+              "crop_type": "absolute",
+              "crop_size": [32, 32]
+            }
+          },
+          {
+            "NAME": "RandomFlip",
+            "ARGS": {
+              "prob": 0.5,
+              "horizontal": True,
+              "vertical": False
+            }
+          }
+        ]
+      TEST:
+        ENABLED: False
+        EXTRAS: "none"
+DATALOADER:
+  ASPECT_RATIO_GROUPING: False
+  FILTER_EMPTY_ANNOTATIONS: False
+MODEL:
+  WEIGHTS: ""
+  PIXEL_MEAN: [125.307, 122.950, 113.865] # r,g,b (matching INPUT.FORMAT)
+  PIXEL_STD: [62.993, 62.089, 66.705] # r,g,b (matching INPUT.FORMAT)
+  META_ARCHITECTURE: "Classifier"
+  BACKBONE:
+    FREEZE_AT: 0
+    NAME: build_resnet_backbone
+  CLASSIFIER_HEAD:
+    NAME: PoolingClassifierHead
+    NUM_CLASSES: 10
+    POOL_METHOD: avg
+    IN_FEATURES: ["res5"]
+    LOSS_KEY: loss_classifier
+    LOSS_WEIGHT: 1.0
+  RESNETS:
+    DEPTH: 18
+    RES2_OUT_CHANNELS: 64
+    OUT_FEATURES: ["res5"]
+DATASETS:
+  TRAIN: ("cifar10_train",)
+  TEST: ("cifar10_test",)
+SOLVER:
+  # Solver setup from Hendrycks et. al 2019 ("Using Self-Supervised Learning...")
+  # Section 3.1, end of section "Setup"
+  # https://arxiv.org/pdf/1906.12340.pdf
+  MAX_ITER: 78125 # 200 epochs @ N=128
+  IMS_PER_BATCH: 128
+  BASE_LR: 0.1
+  WARMUP_ITERS: 400
+  WARMUP_METHOD: "linear"
+  NESTEROV: True
+  MOMENTUM: 0.9
+  LR_SCHEDULER_NAME: "WarmupCosineLR"
+  WEIGHT_DECAY: 0.0005
+  CHECKPOINT_PERIOD: 500
+  AMP:
+    ENABLED: False
+TEST:
+  EVAL_PERIOD: 200
+VERSION: 2

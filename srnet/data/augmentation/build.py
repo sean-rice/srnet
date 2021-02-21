@@ -59,21 +59,8 @@ def build_single_augmentation(
         aug = augmentation_impl.RandomApply(aug, prob=prob)
     return aug
 
-
-# TODO add to cfg:
-# INPUT.AUG.CUSTOM.TRAIN = CfgNode()
-# INPUT.AUG.CUSTOM.TRAIN.ENABLED = False
-# INPUT.AUG.CUSTOM.TRAIN.EXTRAS = "last"
-# INPUT.AUG.CUSTOM.TRAIN.SEQUENCE = [{}]
-# INPUT.AUG.CUSTOM.TEST = CfgNode()
-# INPUT.AUG.CUSTOM.TEST.ENABLED = False
-# INPUT.AUG.CUSTOM.TEST.EXTRAS = "last"
-# INPUT.AUG.CUSTOM.TEST.SEQUENCE = [{}]
-
-
 def _default_pipeline_nodes(cfg: CfgNode, is_train: bool) -> str:
     return "INPUT.AUG.CUSTOM." + ("TRAIN" if is_train else "TEST")
-
 
 def _build_detectron2_defaults(cfg: CfgNode, is_train: bool) -> List[Augmentation]:
     if is_train:
