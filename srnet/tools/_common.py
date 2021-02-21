@@ -26,6 +26,7 @@ from srnet.config import add_srnet_config
 from srnet.engine.defaults import DefaultTrainer as SrDefaultTrainer
 from srnet.evaluation import AccuracyDatasetEvaluator, ConfusionMatrixDatasetEvaluator
 
+
 class Trainer(SrDefaultTrainer):
     """
     We use the "SrDefaultTrainer" which contains pre-defined default logic for
@@ -77,7 +78,7 @@ class Trainer(SrDefaultTrainer):
                 top_ks=getattr(
                     MetadataCatalog.get(dataset_name), "accuracy_top_ks", (1,)
                 ),
-                distrubted=True,
+                distributed=True,
                 output_dir=output_folder,
             )
         elif evaluator_type == "confusion_matrix":
@@ -113,6 +114,7 @@ class Trainer(SrDefaultTrainer):
         res = cls.test(cfg, model, evaluators)
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
+
 
 def setup(args: argparse.Namespace) -> CfgNode:
     """

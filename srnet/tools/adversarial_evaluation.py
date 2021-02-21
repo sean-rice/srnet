@@ -1,11 +1,9 @@
 import argparse
 from ast import literal_eval
-import copy
 import os
 from typing import Any, Callable, Iterable, Optional, Tuple
 
 from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.config import get_cfg
 from detectron2.data import MapDataset, get_detection_dataset_dicts
 from detectron2.data.samplers import InferenceSampler
 from detectron2.engine import default_argument_parser, launch
@@ -14,17 +12,16 @@ import detectron2.utils.comm as comm
 import foolbox
 import foolbox.attacks
 
-import srnet
-from srnet.config import add_srnet_config
 from srnet.data.build import build_batch_data_loader
 from srnet.data.dataset_mappers import SrnetDatasetMapper
 from srnet.evaluation.foolbox_evaluator import FoolboxAccuracyDatasetEvaluator
 from srnet.foolbox.model import FlexiblePyTorchModel
 from srnet.foolbox.wrappers.classifier import FoolboxWrappedClassifier
 
-from ._common import Trainer, setup, remove_arg
+from ._common import Trainer, remove_arg, setup
 
 __all__ = ["main", "get_aversarial_argument_parser", "run"]
+
 
 def main(args):
     cfg = setup(args)
@@ -121,6 +118,7 @@ def add_adversarial_arguments(ap: argparse.ArgumentParser) -> argparse.ArgumentP
     )
     return ap
 
+
 def _get_args() -> argparse.Namespace:
     ap: argparse.ArgumentParser = default_argument_parser()
     ap = remove_arg(ap, "--eval-only")
@@ -129,7 +127,8 @@ def _get_args() -> argparse.Namespace:
     args.eval_only = True
     return args
 
-def run(args: Optional[argparse.Namespace]=None) -> None:
+
+def run(args: Optional[argparse.Namespace] = None) -> None:
     if args is None:
         args = _get_args()
     print("Command Line Args:", args)
