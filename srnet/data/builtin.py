@@ -1,5 +1,6 @@
 from srnet.utils._utils import get_datasets_path
 
+from .datasets.cifar10 import register_cifar10
 from .datasets.mnist import register_mnist
 
 register_mnist(get_datasets_path())
@@ -8,3 +9,5 @@ for prop in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9):
         register_mnist(get_datasets_path(), proportion=prop, seed=seed)
 for size in range(8, 28 + 2, 2):
     register_mnist(get_datasets_path(), size=size)
+
+register_cifar10(get_datasets_path())
