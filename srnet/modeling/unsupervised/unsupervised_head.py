@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 
 from detectron2.config import CfgNode
 from detectron2.layers import ShapeSpec
@@ -43,35 +43,36 @@ class UnsupervisedHead(torch.nn.Module):
     @classmethod
     @abstractmethod
     def from_config(cls, cfg: CfgNode, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-        raise NotImplementedError()
+        ...
 
     def forward(
         self,
         features: Dict[str, torch.Tensor],
         targets: Optional[Dict[str, torch.Tensor]],
     ) -> Tuple[UnsupervisedOutput, Losses]:
-        raise NotImplementedError()
+        ...
 
     @abstractmethod
     def into_per_item_iterable(
         self, network_output: UnsupervisedOutput
-    ) -> List[torch.Tensor]:
-        raise NotImplementedError()
+    ) -> List[Dict[str, torch.Tensor]]:
+        ...
 
-    @classmethod
     @abstractmethod
-    def postprocess(cls, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError()
+    def postprocess(
+        cls, result: Mapping[str, Optional[torch.Tensor]], *args: Any, **kwargs: Any
+    ) -> Dict[str, Any]:
+        ...
 
     @property
     @abstractmethod
     def loss_keys(self) -> Set[str]:
-        raise NotImplementedError()
+        ...
 
     @property
     @abstractmethod
     def output_keys(self) -> Set[str]:
-        raise NotImplementedError()
+        ...
 
 
 def build_unsupervised_head(

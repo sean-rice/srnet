@@ -5,24 +5,22 @@ from detectron2.layers import ShapeSpec
 import torch
 import torch.nn
 
-from srnet.modeling.common.fully_connected import FullyConnectedSequence
 from srnet.utils._utils import find_cfg_node
 
-from ..common.types import Losses
+from ..common.block_sequence import BlockSequence
+from ..common.types import BlockSpecification, Losses
 from .unsupervised_head import (
     UNSUPERVISED_HEAD_REGISTRY,
     UnsupervisedHead,
     UnsupervisedOutput,
 )
 
-__all__ = ["FullyConnectedImageDecoder"]
+__all__ = ["BlockSequenceImageDecoder"]
 
 
 @UNSUPERVISED_HEAD_REGISTRY.register()
-class FullyConnectedImageDecoder(UnsupervisedHead):
+class BlockSequenceImageDecoder(UnsupervisedHead):
     """
-    Deprecated; use BlockSequenceImageDecoder.
-    
     An image decoder that takes a feature map as input and uses a series of
     fully-connected layers to decode an image.
 
@@ -34,14 +32,11 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
     def __init__(
         self,
         in_feature: str,
-        input_shape: Dict[str, ShapeSpec],
-        layer_sizes: Sequence[int],
-        layer_norms: Sequence[str],
-        layer_activations: Sequence[str],
+        block_specs: Sequence[BlockSpecification],
         output_shape: Sequence[int],
         loss_weight: float,
         loss_key: str = "loss_image_decoder",
-        output_key: str = "decoded_images",
+        output_key: str = "decoded_image",
     ):
         super(UnsupervisedHead, self).__init__()
 
@@ -51,13 +46,8 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
         self.loss_key: str = loss_key
         self.output_key: str = output_key
 
-        self.network = FullyConnectedSequence(
-            input_shape[in_feature].width,
-            ("out",),
-            layer_sizes,
-            layer_norms,
-            layer_activations,
-            None,
+        self.blocks: BlockSequence = BlockSequence(
+            out_features=("out",), block_specs=block_specs, input_shape=None
         )
         self.reshape = torch.nn.Unflatten(1, self.output_size)
 
@@ -113,7 +103,7 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
                 images in standard torch.Size([N,C,H,W]) format.
         """
         features: torch.Tensor = features[self.in_feature]  # type: ignore[no-redef]
-        decoded_images = self.network(features)["out"]
+        decoded_images = self.blocks(features)["out"]
         decoded_images = self.reshape(decoded_images)
         return decoded_images
 
@@ -124,23 +114,19 @@ class FullyConnectedImageDecoder(UnsupervisedHead):
         input_shape: Dict[str, ShapeSpec],
         node_path: str = "MODEL.IMAGE_DECODER",
     ) -> Dict[str, Any]:
-        target_node = find_cfg_node(cfg, node_path)
-        assert len(target_node.IN_FEATURES) == 1
-
+        node = find_cfg_node(cfg, node_path)
+        assert len(node.IN_FEATURES) == 1
         return {
-            "in_feature": target_node.IN_FEATURES[0],
-            "input_shape": input_shape,
-            "layer_sizes": target_node.LAYER_SIZES,
-            "layer_norms": target_node.LAYER_NORMS,
-            "layer_activations": target_node.LAYER_ACTIVATIONS,
+            "in_feature": node.IN_FEATURES[0],
+            "block_specs": node.BLOCK_SPECIFICATIONS,
             "output_shape": (
                 len(cfg.MODEL.PIXEL_MEAN),
-                target_node.OUTPUT_HEIGHT,
-                target_node.OUTPUT_WIDTH,
+                node.OUTPUT_HEIGHT,
+                node.OUTPUT_WIDTH,
             ),
-            "loss_weight": target_node.LOSS_WEIGHT,
-            "loss_key": target_node.LOSS_KEY,
-            "output_key": target_node.OUTPUT_KEY,
+            "loss_weight": node.LOSS_WEIGHT,
+            "loss_key": node.LOSS_KEY,
+            "output_key": node.OUTPUT_KEY,
         }
 
     def into_per_item_iterable(

@@ -34,6 +34,10 @@ _NORM_TO_MODULE: Dict[Optional[str], Type] = {
 
 
 class FullyConnectedSequence(Backbone):
+    """
+    Deprecated; use BlockSequence.
+    """
+
     @configurable
     def __init__(
         self,

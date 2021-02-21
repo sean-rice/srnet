@@ -1,1 +1,1 @@
-from . import fully_connected, types
+from . import block_sequence, fully_connected, types

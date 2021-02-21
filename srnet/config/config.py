@@ -22,6 +22,10 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     cfg.MODEL.FULLY_CONNECTED_BACKBONE.LAYER_NORMS = []
     cfg.MODEL.FULLY_CONNECTED_BACKBONE.LAYER_ACTIVATIONS = []
 
+    cfg.MODEL.BLOCK_SEQUENCE_BACKBONE = CfgNode()
+    cfg.MODEL.BLOCK_SEQUENCE_BACKBONE.OUT_FEATURES = []
+    cfg.MODEL.BLOCK_SEQUENCE_BACKBONE.BLOCK_SPECIFICATIONS = [("", {})]
+
     # image classifier heads configuration
 
     cfg.MODEL.CLASSIFIER_HEAD = CfgNode()
@@ -45,17 +49,17 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     cfg.MODEL.UNSUPERVISED_OBJECTIVE = CfgNode()
     cfg.MODEL.UNSUPERVISED_OBJECTIVE.NAME = ""
 
-    cfg.MODEL.MULTI_UNSUPERVISED_OBJECTIVE = CfgNode()
+    cfg.MODEL.UNSUPERVISED_MULTI_OBJECTIVE = CfgNode()
     # a list of Tuple[str, str, str] representing:
     # (head_name_1, objective_type_1, node_path_1)
-    cfg.MODEL.MULTI_UNSUPERVISED_OBJECTIVE.OBJECTIVES_LIST = []
+    cfg.MODEL.UNSUPERVISED_MULTI_OBJECTIVE.OBJECTIVES_LIST = []
     # an optional space to store configuration for
-    cfg.MODEL.MULTI_UNSUPERVISED_OBJECTIVE.OBJECTIVES = CfgNode(new_allowed=True)
+    cfg.MODEL.UNSUPERVISED_MULTI_OBJECTIVE.OBJECTIVES = CfgNode(new_allowed=True)
 
     cfg.MODEL.IMAGE_DECODER = CfgNode()
     cfg.MODEL.IMAGE_DECODER.LOSS_WEIGHT = 1.0
     cfg.MODEL.IMAGE_DECODER.LOSS_KEY = "loss_image_decoder"  # _type: Optional[str]
-    cfg.MODEL.IMAGE_DECODER.OUTPUT_KEY = "decoded_images"
+    cfg.MODEL.IMAGE_DECODER.OUTPUT_KEY = "decoded_image"
     # Features from the backbone to use as input
     # potential value(s): ["p2", "p3", "p4", "p5"]
     cfg.MODEL.IMAGE_DECODER.IN_FEATURES = None
@@ -79,11 +83,15 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     # potential value(s): "" (no norm); "GN" (group norm)
     cfg.MODEL.IMAGE_DECODER.PREDICTOR_NORM = ""
 
-    # For FullyConnectedImageDecoder, the output height/width of the image.
+    # For FullyConnectedImageDecoder and BlockSequenceImageDecoder, the output
+    # height/width of the image.
     # Note that the output number of channels is derived as len(cfg.MODEL.PIXEL_MEAN)
     # Note also that the final output layer's size must equal output C*H*W.
     cfg.MODEL.IMAGE_DECODER.OUTPUT_HEIGHT = -1
     cfg.MODEL.IMAGE_DECODER.OUTPUT_WIDTH = -1
+    # for BlockSequenceImageDecoder, the block sequence configuration.
+    # This is a list of tuples of the form (block class, {block init kwargs}).
+    cfg.MODEL.IMAGE_DECODER.BLOCK_SPECIFICATIONS = [("", {})]
     # for FullyConnectedImageDecoder, the number of hidden units in each layer
     # of the image decoding network.
     # potential value(s): [n0>=1, n1>=1, ..., nX>=1]

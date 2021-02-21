@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers.shape_spec import ShapeSpec
@@ -104,6 +104,7 @@ class UxClassifier(Classifier):
         images: torch.Tensor,
         targets: Optional[torch.Tensor] = None,
         unsup_targets: Optional[Dict[str, Any]] = None,
+        recursions: int = 0,  # TODO: recursions
     ) -> ClassifierResult:
         features: Dict[str, torch.Tensor] = self.backbone(images)
         class_scores: torch.Tensor
@@ -137,7 +138,7 @@ class UxClassifier(Classifier):
                 batched_inputs,
                 images.image_sizes,
                 cast(Sequence[torch.Tensor], classifier_results.class_scores),
-                classifier_results.extras["unsupervised_output"],
+                classifier_results.extras.get("unsupervised_output", None),
             )
             return results
         else:
@@ -153,18 +154,23 @@ class UxClassifier(Classifier):
 
         n_inputs = len(batched_inputs)
 
-        unsupervised_items: Optional[Sequence[Optional[torch.Tensor]]] = None
+        unsupervised_items: Sequence[Mapping[str, Optional[torch.Tensor]]]
         if unsupervised_output is not None:
-            unsupervised_items = self.unsupervised_head.into_per_item_iterable(
-                unsupervised_output
+            unsupervised_items = cast(
+                Sequence[Mapping[str, Optional[torch.Tensor]]],
+                self.unsupervised_head.into_per_item_iterable(unsupervised_output),
+            )
+        else:
+            _nones_dict = {k: None for k in self.unsupervised_head.output_keys}
+            unsupervised_items = cast(
+                Sequence[Mapping[str, Optional[torch.Tensor]]],
+                (_nones_dict,) * n_inputs,
             )
 
-        if classifier_results is None or unsupervised_items is None:
-            nones = (None,) * n_inputs
-            if classifier_results is None:
-                classifier_results = nones
-            if unsupervised_items is None:
-                unsupervised_items = nones
+        if classifier_results is None:
+            classifier_results = cast(
+                Sequence[Optional[torch.Tensor]], (None,) * n_inputs
+            )
 
         if n_inputs != len(images_sizes):
             raise ValueError(f"length mismatch; {n_inputs=} but {len(images_sizes)=}")
@@ -182,7 +188,7 @@ class UxClassifier(Classifier):
             image_input = batched_inputs[i]
             image_size = images_sizes[i]
             image_class_scores = classifier_results[i]
-            image_unsup_result = unsupervised_items[i]
+            image_unsup_result = unsupervised_items[i]  # {output_key: head_result}
 
             h: int = image_input.get("height", image_size[0])
             w: int = image_input.get("width", image_size[1])
@@ -190,7 +196,10 @@ class UxClassifier(Classifier):
                 results[i]["pred_class_scores"] = image_class_scores
             if image_unsup_result is not None:
                 u = self.unsupervised_head.postprocess(
-                    image_unsup_result, image_size, h, w
+                    image_unsup_result,
+                    img_size=image_size,
+                    output_height=h,
+                    output_width=w,
                 )
                 results[i]["unsupervised"] = u
         return results

@@ -1,5 +1,5 @@
 import copy
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
@@ -202,17 +202,18 @@ class ImageDecoder(UnsupervisedHead):
 
     def into_per_item_iterable(
         self, network_output: UnsupervisedOutput
-    ) -> List[torch.Tensor]:
-        return [img for img in network_output[self.output_key]]
+    ) -> List[Dict[str, torch.Tensor]]:
+        return [{self.output_key: img} for img in network_output[self.output_key]]
 
-    @classmethod
     def postprocess(  # type: ignore[override]
-        cls,
-        result: torch.Tensor,
+        self,
+        result: Mapping[str, Optional[torch.Tensor]],
+        *,
         img_size: Tuple[int, int],
         output_height: int,
         output_width: int,
-    ) -> torch.Tensor:
+        **kwargs: Any,
+    ) -> Dict[str, Optional[torch.Tensor]]:
         """
         Return image decoder predictions in the original resolution.
 
@@ -228,14 +229,14 @@ class ImageDecoder(UnsupervisedHead):
             image decoder prediction (Tensor): A tensor of the shape
                 (C, output_height, output_width) that contains the prediction.
         """
-        result = result[:, : img_size[0], : img_size[1]].expand(1, -1, -1, -1)
-        result = torch.nn.functional.interpolate(
-            result,
-            size=(output_height, output_width),
-            mode="bilinear",
-            align_corners=False,
+        r: Optional[torch.Tensor] = result.get(self.output_key, None)  # image
+        if r is None:
+            return {self.output_key: None}
+        r = r[:, : img_size[0], : img_size[1]].expand(1, -1, -1, -1)
+        r = torch.nn.functional.interpolate(
+            r, size=(output_height, output_width), mode="bilinear", align_corners=False,
         )[0]
-        return result
+        return {self.output_key: r}
 
     @property
     def loss_keys(self) -> Set[str]:
