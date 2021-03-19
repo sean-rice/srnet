@@ -20,11 +20,13 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     cfg.INPUT.AUG.CUSTOM.TRAIN = CfgNode()
     cfg.INPUT.AUG.CUSTOM.TRAIN.ENABLED = False
     cfg.INPUT.AUG.CUSTOM.TRAIN.EXTRAS = "last"
-    cfg.INPUT.AUG.CUSTOM.TRAIN.SEQUENCE = [] # [{"NAME": n, "ARGS": {}, "PROB": None}, ...]
+    # SEQUENCE structure: [{"NAME": n, "ARGS": {}, "PROB": None}, ...]
+    cfg.INPUT.AUG.CUSTOM.TRAIN.SEQUENCE = []
     cfg.INPUT.AUG.CUSTOM.TEST = CfgNode()
     cfg.INPUT.AUG.CUSTOM.TEST.ENABLED = False
     cfg.INPUT.AUG.CUSTOM.TEST.EXTRAS = "last"
-    cfg.INPUT.AUG.CUSTOM.TEST.SEQUENCE = [] # [{"NAME": n, "ARGS": {}, "PROB": None}, ...]
+    # SEQUENCE structure: [{"NAME": n, "ARGS": {}, "PROB": None}, ...]
+    cfg.INPUT.AUG.CUSTOM.TEST.SEQUENCE = []
 
     # backbones configuration
 
