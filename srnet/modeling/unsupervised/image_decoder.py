@@ -1,4 +1,5 @@
 import copy
+import os
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from detectron2.config import CfgNode, configurable
@@ -150,6 +151,14 @@ class ImageDecoder(UnsupervisedHead):
                 )
                 * self.loss_weight
             )
+
+            # prevents a very bizarre divergence/crash situation with the
+            # combination of UxClassifier on CIFAR-10 with R18 backbone, and
+            # ImageDecoder unsupervised objective as autoencoder on "res5".
+            # TODO: fix in a better way; or at least make sure it isn't v slow.
+            with open(os.devnull, "w") as nullf:
+                print(losses[self.loss_key], file=nullf, flush=True)
+
         return results, losses
 
     def layers(self, features: Dict[str, torch.Tensor]) -> torch.Tensor:
