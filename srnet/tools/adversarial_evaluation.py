@@ -66,7 +66,14 @@ def main(args):
         num_workers=cfg.DATALOADER.NUM_WORKERS,
         drop_last=False,  # always test entire dataset, don't drop any examples
     )
-    attack = foolbox.attacks.LinfPGD(steps=args.adversarial_steps)
+    # build attack
+    attack_args = {"steps": args.adversarial_steps}
+    if args.adversarial_rel_stepsize is not None:
+        attack_args["rel_stepsize"] = args.adversarial_rel_stepsize
+    if args.adversarial_abs_stepsize is not None:
+        attack_args["abs_stepsize"] = args.adversarial_abs_stepsize
+    attack = foolbox.attacks.LinfPGD(**attack_args)
+    # run evaluation
     res = inference_on_dataset(
         model,
         loader,
@@ -102,13 +109,25 @@ def add_adversarial_arguments(ap: argparse.ArgumentParser) -> argparse.ArgumentP
         "--adversarial-epsilons",
         type=lambda s: _parse_tuple(s, cast=float),
         default=(2.0, 8.0, 16.0),
-        help="the epsilons (perturbation budgets) to attack with.",
+        help="the epsilons (perturbation budgets) to attack with, as a tuple. default: %(default)s",
     )
     ap.add_argument(
         "--adversarial-steps",
         type=int,
         default=40,
         help="the number of steps the adversary can take. default: %(default)s",
+    )
+    ap.add_argument(
+        "--adversarial-rel-stepsize",
+        type=float,
+        default=None,
+        help="rel stepsize of attack. if None, uses foolbox default. default: %(default)s",
+    )
+    ap.add_argument(
+        "--adversarial-abs-stepsize",
+        type=float,
+        default=None,
+        help="abs stepsize of attack. if present, overrides rel stepsize. default: %(default)s",
     )
     ap.add_argument(
         "--adversarial-batch-size",
