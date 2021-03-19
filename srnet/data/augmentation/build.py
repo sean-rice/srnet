@@ -33,7 +33,7 @@ TRANSFORM_REGISTRY.__doc__ = """
 Registry for data transformations. Registered objects should be a subclass of
 `fvcore.transforms.transform.Transform`.
 """
-# preload with fvcore, d2, srnet transforms
+# preload with fvcore, d2 transforms
 for transform_module in (d2_transform, fvc_transform):
     for _, cls in inspect.getmembers(transform_module):
         if type(cls) in (type, ABCMeta) and issubclass(cls, fvc_transform.Transform):
@@ -59,8 +59,10 @@ def build_single_augmentation(
         aug = augmentation_impl.RandomApply(aug, prob=prob)
     return aug
 
+
 def _default_pipeline_nodes(cfg: CfgNode, is_train: bool) -> str:
     return "INPUT.AUG.CUSTOM." + ("TRAIN" if is_train else "TEST")
+
 
 def _build_detectron2_defaults(cfg: CfgNode, is_train: bool) -> List[Augmentation]:
     if is_train:

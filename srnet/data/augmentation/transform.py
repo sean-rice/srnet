@@ -1,4 +1,4 @@
-from typing import Any, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Optional, Sequence, Tuple, Union
 
 from fvcore.transforms.transform import Transform
 import numpy as np
@@ -9,26 +9,29 @@ __all__ = ["PadTransform"]
 
 
 @TRANSFORM_REGISTRY.register()
-class PadTransform(Transform):
+class SrPadTransform(Transform):
     """
     Pads a source image with a fixed number of pixels at the front/back of
     the spatial axes (shapes NxWxHxC, HxWxC, or HxW).
+
+    This transform is only needed if padded with a vector value over channels;
+    otherwise, prefer the other `fvcore.transforms.transform.PadTransform`.
     """
 
     def __init__(
         self,
-        left: int,
-        right: int,
-        top: int,
-        bottom: int,
+        x0: int,
+        y0: int,
+        x1: int,
+        y1: int,
         padding_image: Union[float, int, Sequence[Any]],
         padding_segmentation: int = 0,
         **kwargs: Sequence[Any],
     ):
         super().__init__()
-        if not (left >= 0 and right >= 0 and top >= 0 and bottom >= 0):
+        if not (x0 >= 0 and x1 >= 0 and y0 >= 0 and y1 >= 0):
             raise ValueError(
-                f"can't pad with negative values; {left=}, {right=}, {top=}, {bottom=}"
+                f"can't pad with negative values; {x0=}, {x1=}, {y0=}, {y1=}"
             )
 
         vars = locals()
@@ -60,45 +63,44 @@ class PadTransform(Transform):
             assert isinstance(constant_values, (int, float, np.uint8))
             padded = np.pad(
                 img,
-                ((self.top, self.bottom), (self.left, self.right)),
+                ((self.y0, self.y1), (self.x0, self.x1)),
                 mode="constant",
                 constant_values=constant_values,
             )
-        elif len(img.shape) in {3, 4}:
+        elif len(img.shape) in (3, 4):
             # [Nx]HxWxC
             pad_width: Tuple[Tuple[int, int], ...] = (
-                (self.top, self.bottom),
-                (self.left, self.right),
+                (self.y0, self.y1),
+                (self.x0, self.x1),
                 (0, 0),
             )
             if len(img.shape) == 4:
                 pad_width = ((0, 0),) + pad_width
-            padded = np.pad(img, pad_width, mode="constant", constant_values=0)
             if not isinstance(constant_values, Sequence):
-                constant_values = (constant_values,) * padded.shape[-1]
-                constant_values = cast(Sequence, constant_values)
-            for c in range(padded.shape[-1]):
-                ####################################################
-                # |                                                |#
-                # |<----------- [..., :self.top, :, c] ----------->|#
-                # |                                                |#
-                # ========+---------------------------+============|#
-                # |   ^   |                           |     ^      |#
-                # | :left |        (original)         |            |#
-                # |<     >|         (image)           |<  -right: >|#
-                # |   v   |                           |     v      |#
-                # ========+---------------------------+============|#
-                # |<--------- [..., -self.bottom:, :, c] --------->|#
-                # |                                                |#
-                ####################################################
-                padded[..., : self.top, :, c] = constant_values[c]
-                padded[..., -self.bottom :, :, c] = constant_values[c]
-                padded[..., self.top : -self.bottom, : self.left, c] = constant_values[
-                    c
-                ]
-                padded[
-                    ..., self.top : -self.bottom, -self.right :, c
-                ] = constant_values[c]
+                padded = np.pad(
+                    img, pad_width, mode="constant", constant_values=constant_values
+                )
+            else:
+                # fill with 0s, then replace with vector values below
+                padded = np.pad(img, pad_width, mode="constant", constant_values=0)
+                for c in range(padded.shape[-1]):
+                    # +------------------------------------------------+
+                    # |                       ^                        |
+                    # |<----------- [..., :self.y0, :, c] ------------>|
+                    # |                       V                        |
+                    # ========+---------------------------+============|
+                    # |   ^   |                           |     ^      |
+                    # |< :x0 >|      (original image)     |<-- -x1: -->|
+                    # |   v   |                           |     v      |
+                    # ========+---------------------------+============|
+                    # |                       ^                        |
+                    # |<----------- [..., -self.y1:, :, c] ----------->|
+                    # |                       V                        |
+                    # +------------------------------------------------+
+                    padded[..., : self.y0, :, c] = constant_values[c]
+                    padded[..., -self.y1 :, :, c] = constant_values[c]
+                    padded[..., self.y0 : -self.y1, : self.x0, c] = constant_values[c]
+                    padded[..., self.y0 : -self.y1, -self.x1 :, c] = constant_values[c]
         else:
             raise ValueError(f"too many dimensions in image. {img.shape=}")
         return padded
@@ -116,8 +118,7 @@ class PadTransform(Transform):
         Returns:
             ndarray: cropped coordinates.
         """
-        # TODO: check this! maybe using incorrect (top-left) origin?
-        return coords + (self.left, self.top)
+        return coords + (self.x0, self.y0)
 
     # def inverse(self) -> Transform:
     #    return CropTransform()

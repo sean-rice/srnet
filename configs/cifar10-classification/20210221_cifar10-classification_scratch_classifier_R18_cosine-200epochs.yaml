@@ -26,9 +26,9 @@ INPUT:
           {
             "NAME": "TransformWrapper",
             "ARGS": {
-              "_TRANSFORM_NAME": "PadTransform",
-              "top": 4, "bottom": 4, "left": 4, "right": 4,
-              "padding_image": 0
+              "_TRANSFORM_NAME": "SrPadTransform",
+              "x0": 4, "y0": 4, "x1": 4, "y1": 4,
+              "padding_image": [125.307, 122.950, 113.865] # MODEL.PIXEL_MEAN
             }
           },
           {
