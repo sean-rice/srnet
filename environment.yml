@@ -12,9 +12,9 @@ dependencies:
     - mypy_extensions=0.4.3=py38_0
     - pip=20.2.4=py38_0
     - python=3.8.5=h7579374_1
-    - pytorch=1.7.0=py3.8_cuda10.2.89_cudnn7.6.5_0
+    - pytorch=1.8.0=py3.8_cuda10.2_cudnn7.6.5_0
     - seaborn=0.11.0=py_0
-    - torchvision=0.8.1=py38_cu102
+    - torchvision=0.9.0=py38_cu102
     - pip:
         - autoflake==1.4
         - black==19.10b0
@@ -23,9 +23,9 @@ dependencies:
         - pycocotools==2.0.2
         - opencv-python==4.4.0.44
         - tabulate==0.8.7
-        - tensorboard==2.3.0
-        - tensorboard-plugin-wit==1.7.0
-        - -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu102/torch1.7/index.html
-        - detectron2==0.3
+        - tensorboard==2.4.1
+        - tensorboard-plugin-wit==1.8.0
+        - -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu102/torch1.8/index.html
+        - detectron2==0.4
         - -e /home/rices6/projects/srnet
 prefix: /home/rices6/.conda/envs/srnet
