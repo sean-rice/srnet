@@ -3,10 +3,11 @@ from typing import Any, Callable, Dict, Optional
 
 from detectron2.config import CfgNode
 from detectron2.data import detection_utils as utils
-from detectron2.data import transforms as T
 from detectron2.data.dataset_mapper import DatasetMapper
 import numpy as np
 import torch
+
+from srnet.data.augmentation.augmentation import SrAugInput
 
 __all__ = ["SrnetDatasetMapper"]
 
@@ -73,9 +74,14 @@ class SrnetDatasetMapper(DatasetMapper):
         else:
             sem_seg_gt = None
 
-        aug_input = T.AugInput(image, sem_seg=sem_seg_gt)
+        aug_input = SrAugInput(image, sem_seg=sem_seg_gt, image_orientation=0.0)
         transforms = self.augmentations(aug_input)
-        image, sem_seg_gt = aug_input.image, aug_input.sem_seg
+        image, sem_seg_gt, image_orientation = (
+            aug_input.image,
+            aug_input.sem_seg,
+            aug_input.image_orientation,
+        )
+        dataset_dict["image_orientation"] = image_orientation  # _type: float
 
         image_shape = image.shape[:2]  # h, w
         # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory,

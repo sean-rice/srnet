@@ -1,5 +1,6 @@
 from typing import Any, Optional, Sequence, Tuple, Union
 
+from detectron2.data.transforms import transform
 from fvcore.transforms.transform import Transform
 import numpy as np
 
@@ -52,7 +53,7 @@ class SrPadTransform(Transform):
                 of type uint8 in range [0, 255], or floating point in range
                 [0, 1] or [0, 255].
         Returns:
-            ndarray: image after apply the transformation.
+            ndarray: image after applying the transformation.
         """
         if padding_attr is None:
             padding_attr = "padding_image"
@@ -122,3 +123,12 @@ class SrPadTransform(Transform):
 
     # def inverse(self) -> Transform:
     #    return CropTransform()
+
+
+@transform.RotationTransform.register_type("image_orientation")
+def rotate_image_orientation(
+    rot_transform: transform.RotationTransform, image_orientation: float
+) -> float:
+    angle = rot_transform.angle
+    assert float.is_integer(angle) and int(angle) in (0, 90, 180, 270, -90, -180, -270)
+    return (image_orientation + angle) % 360
