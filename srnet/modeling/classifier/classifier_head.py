@@ -1,11 +1,13 @@
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from detectron2.config import CfgNode
 from detectron2.layers import ShapeSpec
 from detectron2.utils.registry import Registry
 import torch
+
+from srnet.utils._utils import find_cfg_node
 
 from ..common.types import Losses
 
@@ -44,9 +46,15 @@ class ClassifierHead(torch.nn.Module, metaclass=ABCMeta):
     ) -> Dict[str, Any]:
         raise NotImplementedError()
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def num_classes(self) -> int:
-        raise NotImplementedError()
+        ...
+
+    @property
+    @abstractmethod
+    def loss_keys(self) -> Set[str]:
+        ...
 
     @abstractmethod
     def forward(
@@ -56,7 +64,9 @@ class ClassifierHead(torch.nn.Module, metaclass=ABCMeta):
 
 
 def build_classifier_head(
-    cfg: CfgNode, input_shape: Dict[str, ShapeSpec]
+    cfg: CfgNode,
+    input_shape: Dict[str, ShapeSpec],
+    node_path: str = "MODEL.CLASSIFIER_HEAD",
 ) -> Optional[ClassifierHead]:
     """
     Create a classifier objective from config.
@@ -64,10 +74,14 @@ def build_classifier_head(
     Returns:
         ClassifierHead: a :class:`ClassifierHead` instance.
     """
-    name: str = cfg.MODEL.CLASSIFIER_HEAD.NAME
+    node = find_cfg_node(cfg, node_path)
+
+    name: Optional[str] = node.NAME
     if name is None:
         return None
 
-    classifier_module = CLASSIFIER_HEAD_REGISTRY.get(name)(cfg, input_shape=input_shape)
+    classifier_module = CLASSIFIER_HEAD_REGISTRY.get(name)(
+        cfg, input_shape=input_shape, node_path=node_path
+    )
     assert isinstance(classifier_module, ClassifierHead)
     return classifier_module

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
 
 from detectron2.config import CfgNode, configurable
 from detectron2.layers import ShapeSpec
@@ -35,7 +35,7 @@ class PoolingClassifierHead(ClassifierHead):
         super().__init__()
         self.in_feature: str = in_feature
         self.loss_weight: float = loss_weight
-        self.loss_key: str = loss_key
+        self._loss_key: str = loss_key
 
         pooler: torch.nn.Module
         if pool_method == "avg":
@@ -86,6 +86,10 @@ class PoolingClassifierHead(ClassifierHead):
     def num_classes(self) -> int:
         return self.fc.out_features
 
+    @property
+    def loss_keys(self) -> Set[str]:
+        return {self._loss_key}
+
     def forward(
         self, features: Dict[str, torch.Tensor], targets: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Losses]:
@@ -103,5 +107,5 @@ class PoolingClassifierHead(ClassifierHead):
             cls_loss = self.loss_weight * torch.nn.functional.cross_entropy(
                 cls_scores, targets
             )
-            cls_losses[self.loss_key] = cls_loss
+            cls_losses[self._loss_key] = cls_loss
         return cls_scores, cls_losses
