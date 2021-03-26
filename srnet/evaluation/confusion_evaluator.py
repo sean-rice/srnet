@@ -61,10 +61,9 @@ class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
         if self._distributed:
             comm.synchronize()
             cms = comm.gather(self._cm, dst=0)
-            cm = torch.stack(cms, dim=0).sum(dim=0)
-
             if not comm.is_main_process():
                 return OrderedDict()
+            cm = torch.stack(cms, dim=0).sum(dim=0)
         else:
             cm = self._cm
 

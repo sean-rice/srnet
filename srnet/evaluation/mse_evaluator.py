@@ -77,11 +77,10 @@ class MeanSquaredErrorDatasetEvaluator(DatasetEvaluator):
         # if distributed, gather and sum correct answers
         if self._distributed:
             comm.synchronize()
-            mses = sum(
-                comm.gather(self._mses, dst=0), []
-            )  # List[List[float]] -> List[float]
+            mses_lists: List[List[float]] = comm.gather(self._mses, dst=0)
             if not comm.is_main_process():
                 return OrderedDict()
+            mses = sum(mses_lists, [])  # List[List[float]] -> List[float]
         else:
             mses = self._mses
 
