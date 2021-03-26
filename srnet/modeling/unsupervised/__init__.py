@@ -3,6 +3,7 @@ from . import (
     image_decoder_blocks,
     image_decoder_fc,
     multi_objective,
+    orientation_classifier,
     unsupervised_head,
     utils,
 )

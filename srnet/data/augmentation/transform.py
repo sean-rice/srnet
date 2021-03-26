@@ -1,6 +1,7 @@
 from typing import Any, Optional, Sequence, Tuple, Union
 
-from detectron2.data.transforms import transform
+from detectron2.data.transforms import transform as d2_transform
+from fvcore.transforms import transform as fvc_transform
 from fvcore.transforms.transform import Transform
 import numpy as np
 
@@ -125,10 +126,40 @@ class SrPadTransform(Transform):
     #    return CropTransform()
 
 
-@transform.RotationTransform.register_type("image_orientation")
+@d2_transform.RotationTransform.register_type("image_orientation")
 def rotate_image_orientation(
-    rot_transform: transform.RotationTransform, image_orientation: float
+    rot_transform: d2_transform.RotationTransform, image_orientation: float
 ) -> float:
-    angle = rot_transform.angle
-    assert float.is_integer(angle) and int(angle) in (0, 90, 180, 270, -90, -180, -270)
-    return (image_orientation + angle) % 360
+    return (image_orientation + rot_transform.angle) % 360.0
+
+
+# these transforms *could* be used, but they are harmful to self-supervised
+# learning of image rotations; if an un-rotated image (0 deg) is h-flipped,
+# the geometric transform indicates the new orientation is 180 deg; in reality,
+# the h-flip doesn't affect "which way is up/down" in natural images, meaning
+# the human-perception orientation is still 0 deg. this makes it impossible for
+# a rotation-classifying network to learn when the geometric rules are strictly
+# applied.
+#
+# instead, we will just throw an error if we receive a non-zero orientation, so
+# the user knows they need to fix the ordering of their augmentation pipeline.
+# note that using a v-flip at any point is unacceptable (for now).
+@fvc_transform.HFlipTransform.register_type("image_orientation")
+def hflip_image_orientation(
+    hflip_transform: fvc_transform.HFlipTransform, image_orientation: float
+) -> float:
+    assert (
+        image_orientation == 0.0
+    ), "don't use h-flip after rotation in augmentation pipeline!"
+    # return (180.0 - image_orientation) % 360.0
+    return image_orientation
+
+
+@fvc_transform.VFlipTransform.register_type("image_orientation")
+def vflip_image_orientation(
+    vflip_transform: fvc_transform.VFlipTransform, image_orientation: float
+) -> float:
+    raise ValueError(
+        "cant't use v-flip in augmentation pipeline for image_orientation AugInputs."
+    )
+    # return (-1.0 * image_orientation) % 360.0

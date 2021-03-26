@@ -121,4 +121,29 @@ def add_srnet_config(cfg: "CfgNode") -> "CfgNode":
     # potential value(s): ["relu" | "sigmoid" | "tanh" | "identity", ..., actX]
     cfg.MODEL.IMAGE_DECODER.LAYER_ACTIVATIONS = []
 
+    cfg.MODEL.ORIENTATION_CLASSIFIER = CfgNode()
+    cfg.MODEL.ORIENTATION_CLASSIFIER.HEAD_NODE = (
+        "MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD"
+    )
+    cfg.MODEL.ORIENTATION_CLASSIFIER.ANGLE_CLASSES = (
+        []
+    )  # _type: List[Union[int, float]]
+    cfg.MODEL.ORIENTATION_CLASSIFIER.ANGLE_TRANSFORM = ""  # _type: str
+    cfg.MODEL.ORIENTATION_CLASSIFIER.LOSS_WEIGHT = 1.0
+    cfg.MODEL.ORIENTATION_CLASSIFIER.LOSS_KEY = "loss_orientation_classifier"
+    cfg.MODEL.ORIENTATION_CLASSIFIER.OUTPUT_KEY = "pred_orientation_class"
+    cfg.MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD = CfgNode(new_allowed=True)
+    cfg.MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD.NAME = "PoolingClassifierHead"
+    # the following nodes are here so a classifier head can pull them out in
+    # its from_config(), but will always be overwritten by the orientation
+    # classifier's from_config() with appropriate values from above.
+    cfg.MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD.NUM_CLASSES = 2  # unused
+    cfg.MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD.LOSS_WEIGHT = 1.0  # unused
+    cfg.MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD.LOSS_KEY = (
+        "loss_you_shouldnt_see_this"  # unused
+    )
+
+    # other args that will be needed by the orientation classifier head should
+    # also be placed in the model config's MODEL.ORIENTATION_CLASSIFIER.CLASSIFIER_HEAD
+    # node.
     return cfg
