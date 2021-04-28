@@ -1,7 +1,8 @@
 from collections import OrderedDict
+import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from detectron2.data import Metadata
 from detectron2.evaluation import DatasetEvaluator
@@ -22,11 +23,20 @@ class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
         metadata: Optional[Metadata] = None,
         distributed: bool = True,
         output_dir: Optional[str] = None,
+        output_name: str = "confusion_matrix",
+        task_name: str = "classification",
+        get_target: Optional[Callable[[Dict[str, Any]], int]] = None,
+        get_prediction: Optional[Callable[[Dict[str, Any]], int]] = None,
     ) -> None:
         self._logger: logging.Logger = logging.getLogger(__name__)
         self._metadata: Optional[Metadata] = metadata
         self._distributed: bool = distributed
         self._output_dir: Optional[str] = output_dir
+        self._output_name: str = output_name
+
+        self._task_name: str = task_name
+        self._get_target = get_target
+        self._get_prediction = get_prediction
 
         self._cm: torch.Tensor = torch.zeros(
             (num_classes, num_classes),
@@ -51,8 +61,18 @@ class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
                 `torch.Tensor` of class scores.
         """
         for input, output in zip(inputs, outputs):
-            actual_class: int = input["class_label"].item()
-            predicted_class: int = int(torch.argmax(output["pred_class_scores"]).item())
+            actual_class: int
+            if self._get_target is None:
+                actual_class = input["class_label"].item()
+            else:
+                actual_class = self._get_target(input)
+
+            predicted_class: int
+            if self._get_prediction is None:
+                predicted_class = int(torch.argmax(output["pred_class_scores"]).item())
+            else:
+                predicted_class = self._get_prediction(output)
+
             self._cm[predicted_class, actual_class] += 1
 
     def evaluate(self, max_table_size: int = 25) -> "OrderedDict[str, Dict[str, Any]]":
@@ -70,9 +90,13 @@ class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
         # saving confusion matrix
         if self._output_dir:
             PathManager.mkdirs(self._output_dir)
-            file_path = os.path.join(self._output_dir, "confusion_matrix.pth")
+            file_path = os.path.join(self._output_dir, self._output_name + ".pth")
             with PathManager.open(file_path, "wb") as f:
                 torch.save(cm, f)
+            file_path = os.path.join(self._output_dir, self._output_name + ".json")
+            with PathManager.open(file_path, "w") as f:
+                json_dict = {"confusion_matrix": cm.to("cpu").tolist()}
+                json.dump(json_dict, f)
 
         # calculating accuracy
         accuracy = self.accuracy(cm)
@@ -96,7 +120,7 @@ class ConfusionMatrixDatasetEvaluator(DatasetEvaluator):
 
         # collect and return results
         results: OrderedDict[str, Dict[str, float]] = OrderedDict(
-            [("classification", {"top1": accuracy})]
+            [(self._task_name, {"top1": accuracy})]
         )
         self._logger.info(results)
         return results
