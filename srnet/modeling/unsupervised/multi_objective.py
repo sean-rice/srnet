@@ -64,7 +64,7 @@ class UnsupervisedMultiObjective(UnsupervisedHead):
         for head_name, objective_type, head_cfg_path in target_node.OBJECTIVES_LIST:
             head_module = UNSUPERVISED_HEAD_REGISTRY.get(objective_type)
             heads[head_name] = head_module(cfg, input_shape, node_path=head_cfg_path)
-        return {"unsupervised_heads": heads}  # TODO: test
+        return {"unsupervised_heads": heads}
 
     def forward(
         self,
