@@ -16,6 +16,7 @@ dependencies:
     - seaborn=0.11.0=py_0
     - torchvision=0.9.0=py38_cu102
     - pip:
+        - altair==4.1.0
         - autoflake==1.4
         - black==19.10b0
         - debugpy==1.1.0
