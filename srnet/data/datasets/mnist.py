@@ -1,6 +1,6 @@
 import functools
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from PIL import Image
 import numpy as np
@@ -28,11 +28,17 @@ def _make_mnist_dicts(
 
     # loading the data
     data: torch.Tensor
-    labels: torch.Tensor
-    data, labels = torch.load(str(dataset_path))
-    data, labels = data.to("cpu"), labels.to("cpu")
+    labels_tensor: torch.Tensor
+    data, labels_tensor = torch.load(str(dataset_path))
+    data = data.to("cpu")
+    # for the labels, we use a python list instead of a tensor; now, when
+    # indexed below, results in a `int` rather than a 1-element tensor.
+    # fixes #1: https://github.com/sean-rice/srnet/issues/1
+    # don't know why this isn't an issue for cifar-10...
+    labels: Sequence[int] = labels_tensor.tolist()
+    del labels_tensor
     n_examples, h, w, = data.shape
-    assert n_examples == labels.shape[0]
+    assert n_examples == len(labels)
 
     # select indices
     indices: List[int]
@@ -67,7 +73,7 @@ def _make_mnist_dicts(
             "height": examples[i].shape[0],
             "width": examples[i].shape[1],
             "image_id": id_base.format(i=index),
-            "class_label": labels[index],
+            "class_label": labels[index],  # `int` (see comment about issue #1)
         }
         for i, index in enumerate(indices)
     ]

@@ -90,6 +90,18 @@ class SrnetDatasetMapper(DatasetMapper):
         dataset_dict["image"] = torch.as_tensor(
             np.ascontiguousarray(image.transpose(2, 0, 1))
         )
+
+        # using torch.Tensor for class labels has created strange memory usage
+        # issues when combined with the serialization used in the d2 data
+        # loader, so we should also accept ints and create the tensor objects
+        # on-the-fly.
+        # see #1: https://github.com/sean-rice/srnet/issues/1
+        # also see: `srnet.data.datasets.mnist._make_mnist_dicts`
+        if not isinstance(dataset_dict["class_label"], torch.Tensor):
+            dataset_dict["class_label"] = torch.as_tensor(
+                dataset_dict["class_label"], dtype=torch.long, device="cpu"
+            )
+
         if sem_seg_gt is not None:
             dataset_dict["sem_seg"] = torch.as_tensor(sem_seg_gt.astype("long"))
 
