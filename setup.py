@@ -5,6 +5,6 @@ setup(
     version="0.1.0",
     description="sean rice's neural network research",
     packages=find_packages(exclude=("configs",)),
-    python_requires=">=3.8",
-    install_requires=["fvcore>=0.1.3,<0.1.4", "numpy", "torch",],
+    python_requires=">=3.9",
+    install_requires=["fvcore>=0.1.5,<0.1.6", "numpy", "torch",],
 )

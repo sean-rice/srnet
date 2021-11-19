@@ -73,7 +73,7 @@ def _make_cifar10_dicts(
             "height": examples[i].shape[0],
             "width": examples[i].shape[1],
             "image_id": id_base.format(i=index),
-            "class_label": torch.tensor(labels[index], dtype=torch.int),
+            "class_label": labels[index],  # `int`
         }
         for i, index in enumerate(indices)
     ]
