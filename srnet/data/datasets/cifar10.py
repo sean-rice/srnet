@@ -29,7 +29,7 @@ def _make_cifar10_dicts(
     proportion: Optional[float] = None,
     seed: Optional[int] = None,
     size: Optional[Tuple[int, int]] = None,
-    resize_mode: Any = Image.ANTIALIAS,
+    resize_mode: Any = Image.LANCZOS,
 ) -> List[Dict[str, Any]]:
 
     # loading the data

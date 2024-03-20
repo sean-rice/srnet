@@ -1,3 +1,15 @@
+
+# monkey-patch `PIL.Image.LINEAR` back into existing as an alias of `BILINEAR`.
+# https://github.com/sean-rice/srnet/issues/2
+# https://github.com/facebookresearch/detectron2/issues/5010
+try:
+    import PIL as __PIL
+    if tuple(map(int, __PIL.__version__.split('.'))) >= (10, 0, 0):
+        from PIL import Image as __PIL_Image
+        __PIL_Image.LINEAR = __PIL_Image.BILINEAR
+except ModuleNotFoundError:
+    pass
+
 from . import config, data, engine, evaluation, foolbox, modeling, tools, utils
 
 
